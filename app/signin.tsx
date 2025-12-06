@@ -1,42 +1,118 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
     StyleSheet,
-    View,
     Text,
     TextInput,
     TouchableOpacity,
-    ScrollView,
-    SafeAreaView,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
+    View
 } from 'react-native';
-import { router } from 'expo-router';
+
+// Define types
+type ErrorState = {
+    email: string;
+    password: string;
+    general: string;
+};
+
+type FormField = 'email' | 'password';
 
 export default function SignIn() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState<string>('');
+    const [password, setPassword] = useState<string>('');
+    const [loading, setLoading] = useState<boolean>(false);
+    const [errors, setErrors] = useState<ErrorState>({
+        email: '',
+        password: '',
+        general: ''
+    });
+    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [rememberMe, setRememberMe] = useState<boolean>(false);
 
-    const handleSignIn = () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+    // Validation functions
+    const validateEmail = (email: string): string => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email) return 'Email là bắt buộc';
+        if (!emailRegex.test(email)) return 'Email không hợp lệ';
+        return '';
+    };
+
+    const validatePassword = (password: string): string => {
+        if (!password) return 'Mật khẩu là bắt buộc';
+        if (password.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+        return '';
+    };
+
+    const handleInputChange = (field: FormField, value: string): void => {
+        if (field === 'email') setEmail(value);
+        if (field === 'password') setPassword(value);
+
+        // Clear error for this field when user starts typing
+        setErrors(prev => ({
+            ...prev,
+            [field]: '',
+            general: ''
+        }));
+    };
+
+    const handleSignIn = async (): Promise<void> => {
+        // Validate all fields
+        const emailError = validateEmail(email);
+        const passwordError = validatePassword(password);
+
+        if (emailError || passwordError) {
+            setErrors({
+                email: emailError,
+                password: passwordError,
+                general: ''
+            });
             return;
         }
 
-        // Thử dùng push thay vì replace
-        router.push('/(tabs)');
+        try {
+            setLoading(true);
+            setErrors({ email: '', password: '', general: '' });
 
-        // Hoặc nếu vẫn dùng Alert, đảm bảo không có lỗi
-        // Alert.alert('Success', 'Signed in successfully!', [
-        //     {
-        //         text: 'OK',
-        //         onPress: () => router.push('/(tabs)')
-        //     }
-        // ]);
+            // Simulate API call (replace with actual API)
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Mock authentication - replace with actual API
+            if (email === 'w@gmail.com' && password === '123456') {
+                // Save remember me preference
+                if (rememberMe) {
+                    // Save credentials to secure storage
+                    console.log('Remember me enabled - saving credentials');
+                }
+
+                router.replace('/(tabs)');
+            } else {
+                setErrors(prev => ({
+                    ...prev,
+                    general: 'Email hoặc mật khẩu không đúng'
+                }));
+            }
+        } catch (err) {
+            setErrors(prev => ({
+                ...prev,
+                general: 'Đã xảy ra lỗi. Vui lòng thử lại sau.'
+            }));
+            console.error('Sign in error:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleCreateAccount = () => {
-        // Chuyển đến trang đăng ký
+    const handleForgotPassword = (): void => {
+        router.push('/forgotpassword');
+    };
+
+    const handleCreateAccount = (): void => {
         router.push('/signup');
     };
 
@@ -50,11 +126,18 @@ export default function SignIn() {
                     contentContainerStyle={styles.scrollContainer}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Header - Không có nút back */}
                     <View style={styles.header}>
-                        <Text style={styles.title}>Sign In</Text>
+                        <Text style={styles.title}>Đăng Nhập</Text>
                         <Text style={styles.subtitle}>Find your best ever meal</Text>
                     </View>
+
+                    {/* General Error Message */}
+                    {errors.general ? (
+                        <View style={styles.errorContainer}>
+                            <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                            <Text style={styles.errorText}>{errors.general}</Text>
+                        </View>
+                    ) : null}
 
                     {/* Form */}
                     <View style={styles.form}>
@@ -62,38 +145,126 @@ export default function SignIn() {
                         <View style={styles.inputContainer}>
                             <Text style={styles.label}>Email Address</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[
+                                    styles.input,
+                                    errors.email && styles.inputError
+                                ]}
                                 placeholder="Type your email address"
                                 placeholderTextColor="#999"
                                 value={email}
-                                onChangeText={setEmail}
+                                onChangeText={(value: string) => handleInputChange('email', value)}
+                                onBlur={() => {
+                                    if (email) {
+                                        const error = validateEmail(email);
+                                        setErrors(prev => ({ ...prev, email: error }));
+                                    }
+                                }}
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoComplete="email"
+                                editable={!loading}
                             />
+                            {errors.email ? (
+                                <View style={styles.errorMessageContainer}>
+                                    <Ionicons name="warning" size={14} color="#DC2626" />
+                                    <Text style={styles.errorMessage}>{errors.email}</Text>
+                                </View>
+                            ) : null}
                         </View>
 
                         {/* Password Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Type your password"
-                                placeholderTextColor="#999"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                autoComplete="password"
-                            />
+                            <View style={styles.passwordHeader}>
+                                <Text style={styles.label}>Password</Text>
+                                <TouchableOpacity onPress={handleForgotPassword}>
+                                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.passwordInputContainer}>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        styles.passwordInput,
+                                        errors.password && styles.inputError
+                                    ]}
+                                    placeholder="Type your password"
+                                    placeholderTextColor="#999"
+                                    value={password}
+                                    onChangeText={(value: string) => handleInputChange('password', value)}
+                                    onBlur={() => {
+                                        if (password) {
+                                            const error = validatePassword(password);
+                                            setErrors(prev => ({ ...prev, password: error }));
+                                        }
+                                    }}
+                                    secureTextEntry={!showPassword}
+                                    autoComplete="password"
+                                    editable={!loading}
+                                />
+                                <TouchableOpacity
+                                    style={styles.showPasswordButton}
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    disabled={loading}
+                                >
+                                    <Ionicons
+                                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                        size={22}
+                                        color="#666"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+                            {errors.password ? (
+                                <View style={styles.errorMessageContainer}>
+                                    <Ionicons name="warning" size={14} color="#DC2626" />
+                                    <Text style={styles.errorMessage}>{errors.password}</Text>
+                                </View>
+                            ) : null}
+                        </View>
+
+                        {/* Remember Me Checkbox */}
+                        <View style={styles.rememberMeContainer}>
+                            <TouchableOpacity
+                                style={styles.checkboxContainer}
+                                onPress={() => setRememberMe(!rememberMe)}
+                                disabled={loading}
+                            >
+                                <View style={[
+                                    styles.checkbox,
+                                    rememberMe && styles.checkboxChecked
+                                ]}>
+                                    {rememberMe && (
+                                        <Ionicons name="checkmark" size={16} color="#fff" />
+                                    )}
+                                </View>
+                                <Text style={styles.rememberMeText}>Remember me</Text>
+                            </TouchableOpacity>
                         </View>
 
                         {/* Sign In Button */}
-                        <TouchableOpacity style={styles.primaryButton} onPress={handleSignIn}>
-                            <Text style={styles.primaryButtonText}>Sign In</Text>
+                        <TouchableOpacity
+                            style={[
+                                styles.primaryButton,
+                                loading && styles.buttonDisabled
+                            ]}
+                            onPress={handleSignIn}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.primaryButtonText}>Sign In</Text>
+                            )}
                         </TouchableOpacity>
 
                         {/* Create New Account Button */}
-                        <TouchableOpacity style={styles.secondaryButton} onPress={handleCreateAccount}>
+                        <TouchableOpacity
+                            style={[
+                                styles.secondaryButton,
+                                loading && styles.buttonDisabled
+                            ]}
+                            onPress={handleCreateAccount}
+                            disabled={loading}
+                        >
                             <Text style={styles.secondaryButtonText}>Create New Account</Text>
                         </TouchableOpacity>
                     </View>
@@ -114,12 +285,12 @@ const styles = StyleSheet.create({
     scrollContainer: {
         flexGrow: 1,
         paddingHorizontal: 24,
-        paddingTop: 80,
+        paddingTop: 60,
         paddingBottom: 40,
     },
     header: {
         alignItems: 'center',
-        marginBottom: 60,
+        marginBottom: 40,
     },
     title: {
         fontSize: 32,
@@ -136,13 +307,13 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     inputContainer: {
-        marginBottom: 28,
+        marginBottom: 20,
     },
     label: {
         fontSize: 16,
         fontWeight: '600',
         color: '#000',
-        marginBottom: 12,
+        marginBottom: 8,
     },
     input: {
         borderWidth: 1,
@@ -154,13 +325,95 @@ const styles = StyleSheet.create({
         backgroundColor: '#F9F9F9',
         color: '#000',
     },
+    inputError: {
+        borderColor: '#DC2626',
+        backgroundColor: '#FEF2F2',
+    },
+    passwordHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    forgotPasswordText: {
+        color: '#FF6B35',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    passwordInputContainer: {
+        position: 'relative',
+    },
+    passwordInput: {
+        paddingRight: 50,
+    },
+    showPasswordButton: {
+        position: 'absolute',
+        right: 16,
+        top: 0,
+        bottom: 0,
+        justifyContent: 'center',
+    },
+    rememberMeContainer: {
+        marginBottom: 24,
+    },
+    checkboxContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        marginRight: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkboxChecked: {
+        backgroundColor: '#FF6B35',
+        borderColor: '#FF6B35',
+    },
+    rememberMeText: {
+        fontSize: 14,
+        color: '#4B5563',
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF2F2',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    errorText: {
+        color: '#DC2626',
+        marginLeft: 8,
+        fontSize: 14,
+        flex: 1,
+    },
+    errorMessageContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6,
+    },
+    errorMessage: {
+        color: '#DC2626',
+        fontSize: 12,
+        marginLeft: 4,
+    },
     primaryButton: {
         backgroundColor: '#FF6B35',
         borderRadius: 12,
         paddingVertical: 18,
         alignItems: 'center',
-        marginTop: 20,
+        marginTop: 10,
         marginBottom: 16,
+    },
+    buttonDisabled: {
+        opacity: 0.6,
     },
     primaryButtonText: {
         color: '#fff',

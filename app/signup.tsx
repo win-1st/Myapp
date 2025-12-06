@@ -1,20 +1,19 @@
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
     StyleSheet,
-    View,
     Text,
     TextInput,
     TouchableOpacity,
-    ScrollView,
-    SafeAreaView,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Image,
+    View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 
 export default function SignUp() {
     const [email, setEmail] = useState('');
@@ -58,10 +57,6 @@ export default function SignUp() {
         ]);
     };
 
-    const handleGoBack = () => {
-        router.back();
-    };
-
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
@@ -74,9 +69,6 @@ export default function SignUp() {
                 >
                     {/* Header với nút back */}
                     <View style={styles.header}>
-                        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-                            <Ionicons name="arrow-back" size={24} color="#000" />
-                        </TouchableOpacity>
                         <View style={styles.headerTextContainer}>
                             <Text style={styles.title}>Sign Up</Text>
                             <Text style={styles.subtitle}>Register and eat</Text>
