@@ -70,8 +70,7 @@ export default function SignUp() {
                     {/* Header với nút back */}
                     <View style={styles.header}>
                         <View style={styles.headerTextContainer}>
-                            <Text style={styles.title}>Sign Up</Text>
-                            <Text style={styles.subtitle}>Register and eat</Text>
+                            <Text style={styles.title}>Đăng ký</Text>
                         </View>
                         <View style={styles.backButtonPlaceholder} />
                     </View>
@@ -83,8 +82,8 @@ export default function SignUp() {
                                 <Image source={{ uri: image }} style={styles.avatarImage} />
                             ) : (
                                 <>
-                                    <Text style={styles.avatarText}>Add</Text>
-                                    <Text style={styles.avatarText}>Photo</Text>
+                                    <Text style={styles.avatarText}>Thêm</Text>
+                                    <Text style={styles.avatarText}>Hình</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -94,10 +93,10 @@ export default function SignUp() {
                     <View style={styles.form}>
                         {/* Email Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email Address</Text>
+                            <Text style={styles.label}>Email</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Type your email address"
+                                placeholder="Nhập địa chỉ email của bạn"
                                 placeholderTextColor="#999"
                                 value={email}
                                 onChangeText={setEmail}
@@ -109,10 +108,10 @@ export default function SignUp() {
 
                         {/* Password Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.label}>Mật Khẩu</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="Type your password"
+                                placeholder="Nhập mật khẩu của bạn"
                                 placeholderTextColor="#999"
                                 value={password}
                                 onChangeText={setPassword}
@@ -123,7 +122,7 @@ export default function SignUp() {
 
                         {/* Continue Button */}
                         <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
-                            <Text style={styles.primaryButtonText}>Continue</Text>
+                            <Text style={styles.primaryButtonText}>Đăng Ký</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

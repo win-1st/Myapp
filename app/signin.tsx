@@ -128,7 +128,7 @@ export default function SignIn() {
                 >
                     <View style={styles.header}>
                         <Text style={styles.title}>Đăng Nhập</Text>
-                        <Text style={styles.subtitle}>Find your best ever meal</Text>
+                        <Text style={styles.subtitle}>Tìm bữa ăn ngon nhất của bạn</Text>
                     </View>
 
                     {/* General Error Message */}
@@ -143,13 +143,13 @@ export default function SignIn() {
                     <View style={styles.form}>
                         {/* Email Input */}
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email Address</Text>
+                            <Text style={styles.label}>Email</Text>
                             <TextInput
                                 style={[
                                     styles.input,
                                     errors.email && styles.inputError
                                 ]}
-                                placeholder="Type your email address"
+                                placeholder="Nhập địa chỉ email của bạn"
                                 placeholderTextColor="#999"
                                 value={email}
                                 onChangeText={(value: string) => handleInputChange('email', value)}
@@ -175,9 +175,9 @@ export default function SignIn() {
                         {/* Password Input */}
                         <View style={styles.inputContainer}>
                             <View style={styles.passwordHeader}>
-                                <Text style={styles.label}>Password</Text>
+                                <Text style={styles.label}>Mật Khẩu</Text>
                                 <TouchableOpacity onPress={handleForgotPassword}>
-                                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                                    <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
                                 </TouchableOpacity>
                             </View>
                             <View style={styles.passwordInputContainer}>
@@ -187,7 +187,7 @@ export default function SignIn() {
                                         styles.passwordInput,
                                         errors.password && styles.inputError
                                     ]}
-                                    placeholder="Type your password"
+                                    placeholder="Nhập mật khẩu của bạn"
                                     placeholderTextColor="#999"
                                     value={password}
                                     onChangeText={(value: string) => handleInputChange('password', value)}
@@ -236,7 +236,7 @@ export default function SignIn() {
                                         <Ionicons name="checkmark" size={16} color="#fff" />
                                     )}
                                 </View>
-                                <Text style={styles.rememberMeText}>Remember me</Text>
+                                <Text style={styles.rememberMeText}>Nhớ Mật Khẩu</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -252,7 +252,7 @@ export default function SignIn() {
                             {loading ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
-                                <Text style={styles.primaryButtonText}>Sign In</Text>
+                                <Text style={styles.primaryButtonText}>Đăng Nhập</Text>
                             )}
                         </TouchableOpacity>
 
@@ -265,7 +265,7 @@ export default function SignIn() {
                             onPress={handleCreateAccount}
                             disabled={loading}
                         >
-                            <Text style={styles.secondaryButtonText}>Create New Account</Text>
+                            <Text style={styles.secondaryButtonText}>Tạo Tài Khoản Mới</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
