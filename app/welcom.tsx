@@ -16,14 +16,22 @@ import {
 const { width } = Dimensions.get('window');
 
 // Conditional import cho Lottie
-let LottieView: any = null;
+let LottieComponent: any = null;
 let isWeb = Platform.OS === 'web';
 
-if (!isWeb) {
+if (isWeb) {
+    // Trên web, dùng lottie-react (lottie-web)
     try {
-        LottieView = require('lottie-react-native').default;
+        LottieComponent = require('lottie-react').default;
     } catch (error) {
-        console.log('Lottie not available');
+        console.log('Lottie-web not available on web');
+    }
+} else {
+    // Trên mobile, dùng lottie-react-native
+    try {
+        LottieComponent = require('lottie-react-native').default;
+    } catch (error) {
+        console.log('Lottie-react-native not available');
     }
 }
 
@@ -31,7 +39,37 @@ export default function WelcomeScreen() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;
     const animationRef = useRef<any>(null);
-    const [useFallback, setUseFallback] = useState(isWeb);
+    const [useFallback, setUseFallback] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(3);
+    const progressAnim = useRef(new Animated.Value(0)).current;
+    const [animationData, setAnimationData] = useState<any>(null);
+
+    // Load animation data
+    useEffect(() => {
+        if (isWeb && LottieComponent) {
+            // Trên web, có thể dùng URL trực tiếp
+            // OPTION 1: Dùng URL từ internet (đơn giản nhất)
+            // fetch('https://assets5.lottiefiles.com/packages/lf20_p8bfn5to.json') // Food animation example
+            //  .then(response => response.json())
+            //    .then(data => {
+            //       setAnimationData(data);
+            //   })
+            //    .catch(error => {
+            //       console.log('Error loading Lottie from URL:', error);
+            //       setUseFallback(true);
+            //  });
+
+            // OPTION 2: Từ file local (phức tạp hơn)
+            import('../assets/animations/welcome.json')
+                .then(data => {
+                    setAnimationData(data.default || data);
+                })
+                .catch(error => {
+                    console.log('Error loading JSON on web:', error);
+                    setUseFallback(true);
+                });
+        }
+    }, []);
 
     useEffect(() => {
         // Animation khi mở màn hình
@@ -46,25 +84,44 @@ export default function WelcomeScreen() {
                 duration: 800,
                 useNativeDriver: true,
             }),
+            Animated.timing(progressAnim, {
+                toValue: 1,
+                duration: 3000,
+                useNativeDriver: true,
+            }),
         ]).start();
 
-        // Start Lottie animation nếu có
-        if (animationRef.current && !useFallback) {
-            setTimeout(() => {
-                animationRef.current?.play();
-            }, 300);
-        }
-    }, [useFallback]);
+        // Timer đếm ngược
+        const countdown = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(countdown);
+                    router.replace('/signin');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
 
-    const handleGetStarted = () => {
+        // Tự động chuyển trang sau 3 giây
+        const timeout = setTimeout(() => {
+            router.replace('/signin');
+        }, 4000);
+
+        return () => {
+            clearInterval(countdown);
+            clearTimeout(timeout);
+        };
+    }, []);
+
+    const handleSkip = () => {
         router.replace('/signin');
     };
 
-
-    // Render animation section
+    // Render animation section - ĐƠN GIẢN HÓA: Dùng GIF/Image cho cả web và mobile
     const renderAnimation = () => {
-        // Trên web hoặc fallback, dùng icon hoặc image
-        if (useFallback || !LottieView) {
+        // Nếu dùng fallback
+        if (useFallback || !LottieComponent) {
             return (
                 <View style={styles.fallbackContainer}>
                     <Ionicons name="fast-food" size={120} color="#FF6B35" />
@@ -75,26 +132,44 @@ export default function WelcomeScreen() {
             );
         }
 
-        // Trên mobile, dùng Lottie
+        // Đơn giản: Dùng Image với GIF cho cả web và mobile
         try {
-            // OPTION 1: Từ file local (phải là file JSON)
-            return (
-                <LottieView
-                    ref={animationRef}
-                    // Đảm bảo file là .json, không phải .gif
-                    source={require('../assets/animations/welcome.json')}
-                    autoPlay
-                    loop
-                    style={styles.lottieAnimation}
-                    resizeMode="contain"
-                    onAnimationFailure={(error: any) => {
-                        console.log('Lottie animation failed:', error);
-                        setUseFallback(true);
-                    }}
-                />
-            );
+            if (isWeb) {
+                // Trên web, dùng Lottie từ URL
+                return LottieComponent && animationData ? (
+                    <LottieComponent
+                        animationData={animationData}
+                        loop={true}
+                        autoplay={true}
+                        style={styles.lottieAnimation}
+                    />
+                ) : (
+                    <View style={styles.fallbackContainer}>
+                        <Ionicons name="fast-food" size={120} color="#FF6B35" />
+                        <View style={styles.fallbackIcon}>
+                            <Ionicons name="bicycle" size={40} color="#FF6B35" />
+                        </View>
+                    </View>
+                );
+            } else {
+                // Trên mobile, dùng Lottie từ file local
+                return (
+                    <LottieComponent
+                        ref={animationRef}
+                        source={require('../assets/animations/welcome.json')}
+                        autoPlay
+                        loop
+                        style={styles.lottieAnimation}
+                        resizeMode="contain"
+                        onAnimationFailure={(error: any) => {
+                            console.log('Lottie animation failed:', error);
+                            setUseFallback(true);
+                        }}
+                    />
+                );
+            }
         } catch (error) {
-            console.log('Error loading Lottie animation:', error);
+            console.log('Error loading animation:', error);
             return (
                 <View style={styles.fallbackContainer}>
                     <Ionicons name="fast-food" size={120} color="#FF6B35" />
@@ -108,6 +183,25 @@ export default function WelcomeScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Skip Button với timer - ĐÃ SỬA LỖI ANIMATED */}
+            <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+                <View style={styles.timerContainer}>
+                    <View style={styles.progressBarBackground}>
+                        <Animated.View
+                            style={[
+                                styles.progressBarFill,
+                                {
+                                    // Sửa: Dùng transform scaleX thay vì width percentage
+                                    transform: [{
+                                        scaleX: progressAnim
+                                    }]
+                                }
+                            ]}
+                        />
+                    </View>
+                    <Text style={styles.skipText}>Skip {timeLeft}s</Text>
+                </View>
+            </TouchableOpacity>
 
             <ScrollView
                 contentContainerStyle={styles.scrollContainer}
@@ -172,20 +266,15 @@ export default function WelcomeScreen() {
                             </View>
                         </View>
                     </View>
+
+                    {/* Countdown Message */}
+                    <View style={styles.countdownContainer}>
+                        <Text style={styles.countdownText}>
+                            Redirecting to sign in page in {timeLeft} seconds...
+                        </Text>
+                    </View>
                 </Animated.View>
             </ScrollView>
-
-            {/* Get Started Button */}
-            <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                    style={styles.getStartedButton}
-                    onPress={handleGetStarted}
-                    activeOpacity={0.9}
-                >
-                    <Text style={styles.getStartedText}>Get Started</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.arrowIcon} />
-                </TouchableOpacity>
-            </View>
         </SafeAreaView>
     );
 }
@@ -198,9 +287,50 @@ const styles = StyleSheet.create({
     scrollContainer: {
         flexGrow: 1,
         paddingHorizontal: 24,
-        paddingBottom: 100,
+        paddingBottom: 40,
     },
-
+    skipButton: {
+        alignSelf: 'flex-end',
+        padding: 16,
+        paddingRight: 24,
+    },
+    timerContainer: {
+        position: 'relative',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 20,
+        minWidth: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    progressBarBackground: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        right: 0,
+        backgroundColor: 'transparent',
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: '100%', // Giữ width 100% nhưng animate bằng scaleX
+        backgroundColor: 'rgba(255, 107, 53, 0.2)',
+        borderRadius: 20,
+        transformOrigin: 'left center', // Quan trọng: scale từ trái sang
+    },
+    skipText: {
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '600',
+        zIndex: 1,
+    },
     content: {
         alignItems: 'center',
         paddingTop: 20,
@@ -271,7 +401,7 @@ const styles = StyleSheet.create({
     },
     featuresContainer: {
         width: '100%',
-        marginBottom: 40,
+        marginBottom: 30,
     },
     featureItem: {
         flexDirection: 'row',
@@ -298,39 +428,19 @@ const styles = StyleSheet.create({
         color: '#666',
         lineHeight: 20,
     },
-    buttonContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        paddingHorizontal: 24,
-        paddingVertical: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#E8E8E8',
-    },
-    getStartedButton: {
-        backgroundColor: '#FF6B35',
+    countdownContainer: {
+        marginTop: 20,
+        marginBottom: 20,
+        padding: 12,
+        backgroundColor: '#FFF3E0',
         borderRadius: 12,
-        paddingVertical: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#FFE0B2',
     },
-    getStartedText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    arrowIcon: {
-        marginLeft: 8,
+    countdownText: {
+        fontSize: 14,
+        color: '#FF6B35',
+        textAlign: 'center',
+        fontWeight: '500',
     },
 });
