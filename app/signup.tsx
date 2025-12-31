@@ -18,7 +18,11 @@ import {
 export default function SignUp() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [image, setImage] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const pickImage = async () => {
         // Request permission
@@ -42,20 +46,42 @@ export default function SignUp() {
         }
     };
 
+    const validatePasswords = () => {
+        if (password !== confirmPassword) {
+            setPasswordError('Mật khẩu không khớp');
+            return false;
+        }
+
+        if (password.length < 6) {
+            setPasswordError('Mật khẩu phải có ít nhất 6 ký tự');
+            return false;
+        }
+
+        setPasswordError('');
+        return true;
+    };
+
     const handleContinue = () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+        if (!email || !password || !confirmPassword) {
+            Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
+            return;
+        }
+
+        if (!validatePasswords()) {
             return;
         }
 
         // Xử lý đăng ký
-        Alert.alert('Success', 'Account created successfully!', [
+        Alert.alert('Thành công', 'Tài khoản đã được tạo thành công!', [
             {
                 text: 'OK',
                 onPress: () => router.replace('/(tabs)')
             }
         ]);
     };
+
+    const toggleShowPassword = () => setShowPassword(!showPassword);
+    const toggleShowConfirmPassword = () => setShowConfirmPassword(!showConfirmPassword);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -109,19 +135,78 @@ export default function SignUp() {
                         {/* Password Input */}
                         <View style={styles.inputContainer}>
                             <Text style={styles.label}>Mật Khẩu</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Nhập mật khẩu của bạn"
-                                placeholderTextColor="#999"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                autoComplete="password"
-                            />
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={[styles.input, styles.passwordInput]}
+                                    placeholder="Nhập mật khẩu của bạn"
+                                    placeholderTextColor="#999"
+                                    value={password}
+                                    onChangeText={(text) => {
+                                        setPassword(text);
+                                        if (confirmPassword && text !== confirmPassword) {
+                                            setPasswordError('Mật khẩu không khớp');
+                                        } else {
+                                            setPasswordError('');
+                                        }
+                                    }}
+                                    secureTextEntry={!showPassword}
+                                    autoComplete="password"
+                                />
+                                <TouchableOpacity
+                                    style={styles.eyeButton}
+                                    onPress={toggleShowPassword}
+                                >
+                                    <Text style={styles.eyeButtonText}>
+                                        {showPassword ? '👁️' : '👁️‍🗨️'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.passwordHint}>Mật khẩu phải có ít nhất 6 ký tự</Text>
+                        </View>
+
+                        {/* Confirm Password Input */}
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Nhập Lại Mật Khẩu</Text>
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={[styles.input, styles.passwordInput]}
+                                    placeholder="Nhập lại mật khẩu của bạn"
+                                    placeholderTextColor="#999"
+                                    value={confirmPassword}
+                                    onChangeText={(text) => {
+                                        setConfirmPassword(text);
+                                        if (password !== text) {
+                                            setPasswordError('Mật khẩu không khớp');
+                                        } else {
+                                            setPasswordError('');
+                                        }
+                                    }}
+                                    secureTextEntry={!showConfirmPassword}
+                                    autoComplete="password"
+                                />
+                                <TouchableOpacity
+                                    style={styles.eyeButton}
+                                    onPress={toggleShowConfirmPassword}
+                                >
+                                    <Text style={styles.eyeButtonText}>
+                                        {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            {passwordError ? (
+                                <Text style={styles.errorText}>{passwordError}</Text>
+                            ) : null}
                         </View>
 
                         {/* Continue Button */}
-                        <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
+                        <TouchableOpacity
+                            style={[
+                                styles.primaryButton,
+                                (!email || !password || !confirmPassword || passwordError) && styles.disabledButton
+                            ]}
+                            onPress={handleContinue}
+                            disabled={!email || !password || !confirmPassword || !!passwordError}
+                        >
                             <Text style={styles.primaryButtonText}>Đăng Ký</Text>
                         </TouchableOpacity>
                     </View>
@@ -218,12 +303,43 @@ const styles = StyleSheet.create({
         backgroundColor: '#F9F9F9',
         color: '#000',
     },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    passwordInput: {
+        flex: 1,
+    },
+    eyeButton: {
+        position: 'absolute',
+        right: 16,
+        padding: 8,
+    },
+    eyeButtonText: {
+        fontSize: 20,
+    },
+    passwordHint: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 4,
+        marginLeft: 4,
+    },
+    errorText: {
+        fontSize: 14,
+        color: '#FF3B30',
+        marginTop: 4,
+        marginLeft: 4,
+    },
     primaryButton: {
         backgroundColor: '#FF6B35',
         borderRadius: 12,
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 20,
+    },
+    disabledButton: {
+        backgroundColor: '#FF9C7D',
+        opacity: 0.6,
     },
     primaryButtonText: {
         color: '#fff',
