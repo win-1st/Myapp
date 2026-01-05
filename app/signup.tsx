@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Image,
     KeyboardAvoidingView,
@@ -14,202 +15,186 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import api from '../services/api';
 
 export default function SignUp() {
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [image, setImage] = useState<string | null>(null);
-    const [passwordError, setPasswordError] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+    // 📸 chọn avatar (frontend demo)
     const pickImage = async () => {
-        // Request permission
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
         if (status !== 'granted') {
-            Alert.alert('Permission required', 'Sorry, we need camera roll permissions to make this work!');
+            Alert.alert('Permission denied', 'Cần quyền truy cập thư viện ảnh');
             return;
         }
 
-        // Open image picker
-        let result = await ImagePicker.launchImageLibraryAsync({
+        const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: [1, 1],
             quality: 1,
         });
 
-        if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (!result.canceled && result.assets?.length) {
             setImage(result.assets[0].uri);
         }
     };
 
-    const validatePasswords = () => {
-        if (password !== confirmPassword) {
-            setPasswordError('Mật khẩu không khớp');
+    const validate = () => {
+        if (!username || !email || !password || !confirmPassword) {
+            setError('Vui lòng nhập đầy đủ thông tin');
             return false;
         }
-
         if (password.length < 6) {
-            setPasswordError('Mật khẩu phải có ít nhất 6 ký tự');
+            setError('Mật khẩu tối thiểu 6 ký tự');
             return false;
         }
-
-        setPasswordError('');
+        if (password !== confirmPassword) {
+            setError('Mật khẩu không khớp');
+            return false;
+        }
+        setError('');
         return true;
     };
 
-    const handleContinue = () => {
-        if (!email || !password || !confirmPassword) {
-            Alert.alert('Lỗi', 'Vui lòng điền đầy đủ thông tin');
-            return;
-        }
+    const handleRegister = async () => {
+        if (!validate()) return;
 
-        if (!validatePasswords()) {
-            return;
-        }
+        try {
+            setLoading(true);
+            setError('');
 
-        // Xử lý đăng ký
-        Alert.alert('Thành công', 'Tài khoản đã được tạo thành công!', [
-            {
-                text: 'OK',
-                onPress: () => router.replace('/(tabs)')
-            }
-        ]);
+            const payload = {
+                username,
+                email,
+                password,
+                roles: ['user'], // ⭐ FIX Ở ĐÂY
+            };
+
+            console.log('REGISTER PAYLOAD:', payload);
+
+            const res = await api.post('/auth/register', payload);
+
+            console.log('REGISTER SUCCESS:', res.data);
+
+            Alert.alert('Thành công', 'Đăng ký thành công!', [
+                {
+                    text: 'Đăng nhập',
+                    onPress: () => router.replace('/signin'),
+                },
+            ]);
+        } catch (err: any) {
+            console.log('REGISTER ERROR:', err.response?.data || err.message);
+            setError(
+                typeof err.response?.data === 'string'
+                    ? err.response.data
+                    : err.response?.data?.message || 'Đăng ký thất bại'
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const toggleShowPassword = () => setShowPassword(!showPassword);
-    const toggleShowConfirmPassword = () => setShowConfirmPassword(!showConfirmPassword);
 
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                style={styles.keyboardAvoidingView}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
             >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContainer}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Header với nút back */}
-                    <View style={styles.header}>
-                        <View style={styles.headerTextContainer}>
-                            <Text style={styles.title}>Đăng ký</Text>
-                        </View>
-                        <View style={styles.backButtonPlaceholder} />
-                    </View>
+                <ScrollView contentContainerStyle={styles.scroll}>
+                    <Text style={styles.title}>📝 Đăng ký</Text>
 
-                    {/* Avatar Section - Có thể chọn ảnh */}
-                    <View style={styles.avatarContainer}>
+                    {/* Avatar */}
+                    <View style={styles.avatarWrap}>
                         <TouchableOpacity style={styles.avatar} onPress={pickImage}>
                             {image ? (
-                                <Image source={{ uri: image }} style={styles.avatarImage} />
+                                <Image source={{ uri: image }} style={styles.avatarImg} />
                             ) : (
-                                <>
-                                    <Text style={styles.avatarText}>Thêm</Text>
-                                    <Text style={styles.avatarText}>Hình</Text>
-                                </>
+                                <Text style={styles.avatarText}>Thêm ảnh</Text>
                             )}
                         </TouchableOpacity>
                     </View>
 
-                    {/* Form */}
-                    <View style={styles.form}>
-                        {/* Email Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Nhập địa chỉ email của bạn"
-                                placeholderTextColor="#999"
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                            />
-                        </View>
+                    {error ? <Text style={styles.error}>{error}</Text> : null}
 
-                        {/* Password Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Mật Khẩu</Text>
-                            <View style={styles.passwordContainer}>
-                                <TextInput
-                                    style={[styles.input, styles.passwordInput]}
-                                    placeholder="Nhập mật khẩu của bạn"
-                                    placeholderTextColor="#999"
-                                    value={password}
-                                    onChangeText={(text) => {
-                                        setPassword(text);
-                                        if (confirmPassword && text !== confirmPassword) {
-                                            setPasswordError('Mật khẩu không khớp');
-                                        } else {
-                                            setPasswordError('');
-                                        }
-                                    }}
-                                    secureTextEntry={!showPassword}
-                                    autoComplete="password"
-                                />
-                                <TouchableOpacity
-                                    style={styles.eyeButton}
-                                    onPress={toggleShowPassword}
-                                >
-                                    <Text style={styles.eyeButtonText}>
-                                        {showPassword ? '👁️' : '👁️‍🗨️'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                            <Text style={styles.passwordHint}>Mật khẩu phải có ít nhất 6 ký tự</Text>
-                        </View>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Tên đăng nhập"
+                        value={username}
+                        onChangeText={setUsername}
+                        autoCapitalize="none"
+                    />
 
-                        {/* Confirm Password Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Nhập Lại Mật Khẩu</Text>
-                            <View style={styles.passwordContainer}>
-                                <TextInput
-                                    style={[styles.input, styles.passwordInput]}
-                                    placeholder="Nhập lại mật khẩu của bạn"
-                                    placeholderTextColor="#999"
-                                    value={confirmPassword}
-                                    onChangeText={(text) => {
-                                        setConfirmPassword(text);
-                                        if (password !== text) {
-                                            setPasswordError('Mật khẩu không khớp');
-                                        } else {
-                                            setPasswordError('');
-                                        }
-                                    }}
-                                    secureTextEntry={!showConfirmPassword}
-                                    autoComplete="password"
-                                />
-                                <TouchableOpacity
-                                    style={styles.eyeButton}
-                                    onPress={toggleShowConfirmPassword}
-                                >
-                                    <Text style={styles.eyeButtonText}>
-                                        {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                            {passwordError ? (
-                                <Text style={styles.errorText}>{passwordError}</Text>
-                            ) : null}
-                        </View>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Email"
+                        value={email}
+                        onChangeText={setEmail}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                    />
 
-                        {/* Continue Button */}
+                    <View style={styles.passwordWrap}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Mật khẩu"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry={!showPassword}
+                        />
                         <TouchableOpacity
-                            style={[
-                                styles.primaryButton,
-                                (!email || !password || !confirmPassword || passwordError) && styles.disabledButton
-                            ]}
-                            onPress={handleContinue}
-                            disabled={!email || !password || !confirmPassword || !!passwordError}
+                            style={styles.eye}
+                            onPress={() => setShowPassword(!showPassword)}
                         >
-                            <Text style={styles.primaryButtonText}>Đăng Ký</Text>
+                            <Text>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                         </TouchableOpacity>
                     </View>
+
+                    <View style={styles.passwordWrap}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nhập lại mật khẩu"
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            secureTextEntry={!showConfirmPassword}
+                        />
+                        <TouchableOpacity
+                            style={styles.eye}
+                            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                            <Text>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handleRegister}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>Đăng ký</Text>
+                        )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => router.replace('/signin')}
+                        style={{ marginTop: 20 }}
+                    >
+                        <Text style={styles.loginText}>
+                            Đã có tài khoản? Đăng nhập
+                        </Text>
+                    </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -221,129 +206,74 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#fff',
     },
-    keyboardAvoidingView: {
-        flex: 1,
-    },
-    scrollContainer: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
+    scroll: {
+        padding: 24,
         paddingTop: 60,
-        paddingBottom: 40,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 40,
-    },
-    backButton: {
-        padding: 8,
-    },
-    backButtonPlaceholder: {
-        width: 40,
-    },
-    headerTextContainer: {
-        alignItems: 'center',
-        flex: 1,
     },
     title: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 8,
+        textAlign: 'center',
+        marginBottom: 30,
     },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-    },
-    avatarContainer: {
+    avatarWrap: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: 24,
     },
     avatar: {
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#f0f0f0',
-        justifyContent: 'center',
-        alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#ddd',
         borderStyle: 'dashed',
-        overflow: 'hidden',
+        borderColor: '#ccc',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    avatarImage: {
+    avatarImg: {
         width: '100%',
         height: '100%',
         borderRadius: 50,
     },
     avatarText: {
-        fontSize: 14,
-        color: '#666',
-    },
-    form: {
-        width: '100%',
-    },
-    inputContainer: {
-        marginBottom: 24,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000',
-        marginBottom: 8,
+        color: '#777',
     },
     input: {
         borderWidth: 1,
-        borderColor: '#E8E8E8',
+        borderColor: '#E5E7EB',
         borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
-        backgroundColor: '#F9F9F9',
-        color: '#000',
+        padding: 14,
+        marginBottom: 16,
+        backgroundColor: '#F9FAFB',
     },
-    passwordContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    passwordWrap: {
+        position: 'relative',
     },
-    passwordInput: {
-        flex: 1,
-    },
-    eyeButton: {
+    eye: {
         position: 'absolute',
         right: 16,
-        padding: 8,
+        top: 18,
     },
-    eyeButtonText: {
-        fontSize: 20,
-    },
-    passwordHint: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 4,
-        marginLeft: 4,
-    },
-    errorText: {
-        fontSize: 14,
-        color: '#FF3B30',
-        marginTop: 4,
-        marginLeft: 4,
-    },
-    primaryButton: {
+    button: {
         backgroundColor: '#FF6B35',
+        padding: 16,
         borderRadius: 12,
-        paddingVertical: 16,
         alignItems: 'center',
-        marginTop: 20,
+        marginTop: 10,
     },
-    disabledButton: {
-        backgroundColor: '#FF9C7D',
-        opacity: 0.6,
-    },
-    primaryButtonText: {
+    buttonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '600',
+    },
+    error: {
+        color: '#DC2626',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    loginText: {
+        textAlign: 'center',
+        color: '#2563EB',
+        fontSize: 16,
     },
 });

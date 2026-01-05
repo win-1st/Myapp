@@ -3,273 +3,155 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
     SafeAreaView,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
-
-// Define types
-type ErrorState = {
-    email: string;
-    password: string;
-    general: string;
-};
-
-type FormField = 'email' | 'password';
+import { saveAuth } from '../utils/authStorage';
 
 export default function SignIn() {
-    const [email, setEmail] = useState<string>('');
-    const [password, setPassword] = useState<string>('');
-    const [loading, setLoading] = useState<boolean>(false);
-    const [errors, setErrors] = useState<ErrorState>({
-        email: '',
-        password: '',
-        general: ''
-    });
-    const [showPassword, setShowPassword] = useState<boolean>(false);
-    const [rememberMe, setRememberMe] = useState<boolean>(false);
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    // Validation functions
-    const validateEmail = (email: string): string => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!email) return 'Email là bắt buộc';
-        if (!emailRegex.test(email)) return 'Email không hợp lệ';
-        return '';
+    const redirectByRole = (roles: string[]) => {
+        console.log('🔄 Redirecting by roles:', roles);
+
+        if (roles.includes('ROLE_ADMIN')) {
+            router.replace('/(tabs)');
+            return;
+        }
+
+        // Mặc định chuyển đến tabs cho user thường
+        router.replace('/(tabs)');
     };
 
-    const validatePassword = (password: string): string => {
-        if (!password) return 'Mật khẩu là bắt buộc';
-        if (password.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
-        return '';
-    };
-
-    const handleInputChange = (field: FormField, value: string): void => {
-        if (field === 'email') setEmail(value);
-        if (field === 'password') setPassword(value);
-
-        // Clear error for this field when user starts typing
-        setErrors(prev => ({
-            ...prev,
-            [field]: '',
-            general: ''
-        }));
-    };
-
-    const handleSignIn = async (): Promise<void> => {
-        // Validate all fields
-        const emailError = validateEmail(email);
-        const passwordError = validatePassword(password);
-
-        if (emailError || passwordError) {
-            setErrors({
-                email: emailError,
-                password: passwordError,
-                general: ''
-            });
+    const handleSignIn = async () => {
+        if (!username || !password) {
+            setError('Vui lòng nhập đầy đủ thông tin');
             return;
         }
 
         try {
             setLoading(true);
-            setErrors({ email: '', password: '', general: '' });
+            setError('');
 
-            // Simulate API call (replace with actual API)
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            console.log('📤 LOGIN PAYLOAD:', { username, password });
 
-            // Mock authentication - replace with actual API
-            if (email === 'w@gmail.com' && password === '123456') {
-                // Save remember me preference
-                if (rememberMe) {
-                    // Save credentials to secure storage
-                    console.log('Remember me enabled - saving credentials');
+            const res = await fetch(
+                'https://javatest-production-2db4.up.railway.app/api/auth/login',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                    }),
                 }
+            );
 
-                router.replace('/(tabs)');
-            } else {
-                setErrors(prev => ({
-                    ...prev,
-                    general: 'Email hoặc mật khẩu không đúng'
-                }));
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.message || 'Đăng nhập thất bại');
             }
-        } catch (err) {
-            setErrors(prev => ({
-                ...prev,
-                general: 'Đã xảy ra lỗi. Vui lòng thử lại sau.'
-            }));
-            console.error('Sign in error:', err);
+
+            console.log('✅ LOGIN SUCCESS:', data);
+
+            // Tạo object auth data với đầy đủ thông tin
+            const authData = {
+                token: data.token || data.accessToken,
+                user: {
+                    id: data.id,
+                    username: data.username,
+                    fullName: data.fullName, // Lấy từ backend
+                    email: data.email,
+                    roles: data.roles || []
+                }
+            };
+
+            await saveAuth(authData);
+
+            // Chuyển hướng dựa trên role
+            redirectByRole(data.roles || []);
+
+        } catch (err: any) {
+            console.log('❌ LOGIN ERROR:', err.message);
+            setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleForgotPassword = (): void => {
-        router.push('/forgotpassword');
-    };
-
-    const handleCreateAccount = (): void => {
-        router.push('/signup');
-    };
-
     return (
         <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                style={styles.keyboardAvoidingView}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            <Text style={styles.title}>☕ COFFEE WIN</Text>
+
+            {error ? (
+                <View style={styles.errorBox}>
+                    <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            ) : null}
+
+            <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Tên đăng nhập"
+                    value={username}
+                    onChangeText={setUsername}
+                    autoCapitalize="none"
+                    editable={!loading}
+                    placeholderTextColor="#999"
+                />
+            </View>
+
+            <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Mật khẩu"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    editable={!loading}
+                    placeholderTextColor="#999"
+                />
+            </View>
+
+            <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleSignIn}
+                disabled={loading}
             >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContainer}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Đăng Nhập</Text>
-                        <Text style={styles.subtitle}>Tìm bữa ăn ngon nhất của bạn</Text>
-                    </View>
+                {loading ? (
+                    <ActivityIndicator color="#fff" />
+                ) : (
+                    <Text style={styles.buttonText}>🔑 Đăng nhập</Text>
+                )}
+            </TouchableOpacity>
 
-                    {/* General Error Message */}
-                    {errors.general ? (
-                        <View style={styles.errorContainer}>
-                            <Ionicons name="alert-circle" size={20} color="#DC2626" />
-                            <Text style={styles.errorText}>{errors.general}</Text>
-                        </View>
-                    ) : null}
-
-                    {/* Form */}
-                    <View style={styles.form}>
-                        {/* Email Input */}
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email</Text>
-                            <TextInput
-                                style={[
-                                    styles.input,
-                                    errors.email && styles.inputError
-                                ]}
-                                placeholder="Nhập địa chỉ email của bạn"
-                                placeholderTextColor="#999"
-                                value={email}
-                                onChangeText={(value: string) => handleInputChange('email', value)}
-                                onBlur={() => {
-                                    if (email) {
-                                        const error = validateEmail(email);
-                                        setErrors(prev => ({ ...prev, email: error }));
-                                    }
-                                }}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                                editable={!loading}
-                            />
-                            {errors.email ? (
-                                <View style={styles.errorMessageContainer}>
-                                    <Ionicons name="warning" size={14} color="#DC2626" />
-                                    <Text style={styles.errorMessage}>{errors.email}</Text>
-                                </View>
-                            ) : null}
-                        </View>
-
-                        {/* Password Input */}
-                        <View style={styles.inputContainer}>
-                            <View style={styles.passwordHeader}>
-                                <Text style={styles.label}>Mật Khẩu</Text>
-                                <TouchableOpacity onPress={handleForgotPassword}>
-                                    <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.passwordInputContainer}>
-                                <TextInput
-                                    style={[
-                                        styles.input,
-                                        styles.passwordInput,
-                                        errors.password && styles.inputError
-                                    ]}
-                                    placeholder="Nhập mật khẩu của bạn"
-                                    placeholderTextColor="#999"
-                                    value={password}
-                                    onChangeText={(value: string) => handleInputChange('password', value)}
-                                    onBlur={() => {
-                                        if (password) {
-                                            const error = validatePassword(password);
-                                            setErrors(prev => ({ ...prev, password: error }));
-                                        }
-                                    }}
-                                    secureTextEntry={!showPassword}
-                                    autoComplete="password"
-                                    editable={!loading}
-                                />
-                                <TouchableOpacity
-                                    style={styles.showPasswordButton}
-                                    onPress={() => setShowPassword(!showPassword)}
-                                    disabled={loading}
-                                >
-                                    <Ionicons
-                                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                                        size={22}
-                                        color="#666"
-                                    />
-                                </TouchableOpacity>
-                            </View>
-                            {errors.password ? (
-                                <View style={styles.errorMessageContainer}>
-                                    <Ionicons name="warning" size={14} color="#DC2626" />
-                                    <Text style={styles.errorMessage}>{errors.password}</Text>
-                                </View>
-                            ) : null}
-                        </View>
-
-                        {/* Remember Me Checkbox */}
-                        <View style={styles.rememberMeContainer}>
-                            <TouchableOpacity
-                                style={styles.checkboxContainer}
-                                onPress={() => setRememberMe(!rememberMe)}
-                                disabled={loading}
-                            >
-                                <View style={[
-                                    styles.checkbox,
-                                    rememberMe && styles.checkboxChecked
-                                ]}>
-                                    {rememberMe && (
-                                        <Ionicons name="checkmark" size={16} color="#fff" />
-                                    )}
-                                </View>
-                                <Text style={styles.rememberMeText}>Nhớ Mật Khẩu</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Sign In Button */}
-                        <TouchableOpacity
-                            style={[
-                                styles.primaryButton,
-                                loading && styles.buttonDisabled
-                            ]}
-                            onPress={handleSignIn}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.primaryButtonText}>Đăng Nhập</Text>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Create New Account Button */}
-                        <TouchableOpacity
-                            style={[
-                                styles.secondaryButton,
-                                loading && styles.buttonDisabled
-                            ]}
-                            onPress={handleCreateAccount}
-                            disabled={loading}
-                        >
-                            <Text style={styles.secondaryButtonText}>Tạo Tài Khoản Mới</Text>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+            <TouchableOpacity
+                onPress={() => router.push('/signup')}
+                disabled={loading}
+                style={{ marginTop: 16, alignItems: 'center' }}
+            >
+                <Text style={{
+                    color: '#2563EB',
+                    fontSize: 14,
+                    opacity: loading ? 0.5 : 1
+                }}>
+                    Chưa có tài khoản? Đăng ký
+                </Text>
+            </TouchableOpacity>
         </SafeAreaView>
     );
 }
@@ -277,114 +159,63 @@ export default function SignIn() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        justifyContent: 'center',
+        padding: 24,
         backgroundColor: '#fff',
     },
-    keyboardAvoidingView: {
-        flex: 1,
-    },
-    scrollContainer: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingTop: 60,
-        paddingBottom: 40,
-    },
-    header: {
-        alignItems: 'center',
-        marginBottom: 40,
-    },
     title: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 12,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
         textAlign: 'center',
-    },
-    form: {
-        width: '100%',
+        marginBottom: 32,
+        color: '#333',
     },
     inputContainer: {
-        marginBottom: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 10,
+        marginBottom: 16,
+        paddingHorizontal: 16,
+        backgroundColor: '#F9FAFB',
     },
-    label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000',
-        marginBottom: 8,
+    inputIcon: {
+        marginRight: 10,
     },
     input: {
-        borderWidth: 1,
-        borderColor: '#E8E8E8',
-        borderRadius: 12,
-        paddingHorizontal: 16,
+        flex: 1,
         paddingVertical: 16,
         fontSize: 16,
-        backgroundColor: '#F9F9F9',
-        color: '#000',
+        color: '#333',
     },
-    inputError: {
-        borderColor: '#DC2626',
-        backgroundColor: '#FEF2F2',
-    },
-    passwordHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    forgotPasswordText: {
-        color: '#FF6B35',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    passwordInputContainer: {
-        position: 'relative',
-    },
-    passwordInput: {
-        paddingRight: 50,
-    },
-    showPasswordButton: {
-        position: 'absolute',
-        right: 16,
-        top: 0,
-        bottom: 0,
-        justifyContent: 'center',
-    },
-    rememberMeContainer: {
-        marginBottom: 24,
-    },
-    checkboxContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        borderWidth: 2,
-        borderColor: '#D1D5DB',
-        marginRight: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    checkboxChecked: {
+    button: {
         backgroundColor: '#FF6B35',
-        borderColor: '#FF6B35',
-    },
-    rememberMeText: {
-        fontSize: 14,
-        color: '#4B5563',
-    },
-    errorContainer: {
-        flexDirection: 'row',
+        padding: 16,
+        borderRadius: 12,
         alignItems: 'center',
+        marginTop: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    buttonDisabled: {
+        opacity: 0.7,
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    errorBox: {
+        flexDirection: 'row',
         backgroundColor: '#FEF2F2',
         padding: 12,
         borderRadius: 8,
         marginBottom: 20,
+        alignItems: 'center',
         borderWidth: 1,
         borderColor: '#FECACA',
     },
@@ -393,44 +224,5 @@ const styles = StyleSheet.create({
         marginLeft: 8,
         fontSize: 14,
         flex: 1,
-    },
-    errorMessageContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 6,
-    },
-    errorMessage: {
-        color: '#DC2626',
-        fontSize: 12,
-        marginLeft: 4,
-    },
-    primaryButton: {
-        backgroundColor: '#FF6B35',
-        borderRadius: 12,
-        paddingVertical: 18,
-        alignItems: 'center',
-        marginTop: 10,
-        marginBottom: 16,
-    },
-    buttonDisabled: {
-        opacity: 0.6,
-    },
-    primaryButtonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    secondaryButton: {
-        borderRadius: 12,
-        paddingVertical: 18,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E8E8E8',
-        backgroundColor: 'transparent',
-    },
-    secondaryButtonText: {
-        color: '#666',
-        fontSize: 16,
-        fontWeight: '500',
     },
 });
