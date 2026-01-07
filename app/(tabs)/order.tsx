@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-    StyleSheet,
-    View,
-    Text,
-    SafeAreaView,
     Image,
+    SafeAreaView,
+    StyleSheet,
+    Text,
     TouchableOpacity,
+    View,
 } from 'react-native';
 
 export default function OrderScreen() {

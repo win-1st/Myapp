@@ -1,12 +1,15 @@
-import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
   Image,
   ListRenderItem,
   Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -15,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { productAPI } from '../../services/api';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -28,12 +32,15 @@ interface Restaurant {
 }
 
 interface FoodItem {
-  id: string;
+  id: number;
   name: string;
-  price: string;
-  rating: number;
-  image: string;
+  price: number;
+  rating?: number;
+  imageUrl: string;
   category: string;
+  description?: string;
+  available: boolean;
+  stockQuantity: number;
 }
 
 interface Category {
@@ -41,102 +48,6 @@ interface Category {
   name: string;
   active: boolean;
 }
-
-// Dữ liệu mẫu
-const popularRestaurants: Restaurant[] = [
-  {
-    id: '1',
-    name: 'Cherry Healthy',
-    rating: 4.5,
-    image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=400&fit=crop',
-    category: 'Healthy Food',
-  },
-  {
-    id: '2',
-    name: 'Burger Tamo',
-    rating: 4.0,
-    image: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=400&h=400&fit=crop',
-    category: 'Fast Food',
-  },
-  {
-    id: '3',
-    name: 'Sushi Master',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=400&fit=crop',
-    category: 'Japanese',
-  },
-  {
-    id: '4',
-    name: 'Pizza Palace',
-    rating: 4.3,
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop',
-    category: 'Italian',
-  },
-  {
-    id: '5',
-    name: 'Seafood Harbor',
-    rating: 4.6,
-    image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop',
-    category: 'Seafood',
-  },
-];
-
-const foodItems: FoodItem[] = [
-  {
-    id: '1',
-    name: 'Soup Bumil',
-    price: 'IDR 289,000',
-    rating: 4.1,
-    image: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop',
-    category: 'Soup',
-  },
-  {
-    id: '2',
-    name: 'Grilled Chicken',
-    price: 'IDR 4,509,000',
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=400&h=300&fit=crop',
-    category: 'Chicken',
-  },
-  {
-    id: '3',
-    name: 'Spicy Shrimp',
-    price: 'IDR 999,000',
-    rating: 3.2,
-    image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=300&fit=crop',
-    category: 'Seafood',
-  },
-  {
-    id: '4',
-    name: 'Beef Steak',
-    price: 'IDR 1,250,000',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=400&h=300&fit=crop',
-    category: 'Beef',
-  },
-  {
-    id: '5',
-    name: 'Veggie Salad',
-    price: 'IDR 189,000',
-    rating: 4.3,
-    image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
-    category: 'Salad',
-  },
-  {
-    id: '6',
-    name: 'Pasta Carbonara',
-    price: 'IDR 450,000',
-    rating: 4.4,
-    image: 'https://images.unsplash.com/photo-1598866594230-a7c12756260f?w=400&h=300&fit=crop',
-    category: 'Pasta',
-  },
-];
-
-const categories: Category[] = [
-  { id: '1', name: 'New Taste', active: true },
-  { id: '2', name: 'Popular', active: false },
-  { id: '3', name: 'Recommended', active: false },
-];
 
 // Props interface cho RestaurantCard
 interface RestaurantCardProps {
@@ -162,19 +73,140 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ item, isActive }) => {
 };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<string>('1');
   const [activeRestaurantIndex, setActiveRestaurantIndex] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [filteredFoodItems, setFilteredFoodItems] = useState<FoodItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList<Restaurant>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  // Dữ liệu mẫu cho restaurants
+  const popularRestaurants: Restaurant[] = [
+    {
+      id: '1',
+      name: 'Restaurant 1',
+      rating: 4.5,
+      image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=400&fit=crop',
+      category: 'Nhà hàng',
+    },
+    {
+      id: '2',
+      name: 'Restaurant 2',
+      rating: 4.0,
+      image: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?w=400&h=400&fit=crop',
+      category: 'Quán ăn',
+    },
+    {
+      id: '3',
+      name: 'Restaurant 3',
+      rating: 4.8,
+      image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=400&fit=crop',
+      category: 'Cafe',
+    },
+  ];
+
+  const categories: Category[] = [
+    { id: '1', name: 'Mới nhất', active: true },
+    { id: '2', name: 'Phổ biến', active: false },
+    { id: '3', name: 'Gợi ý', active: false },
+  ];
+
+  // Fetch products từ API
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Trong HomeScreen.tsx - CHỈ SỬA PHẦN fetchProducts
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setLoadingError(null);
+
+      console.log('🔄 Fetching products from Spring Boot...');
+
+      // Gọi đúng endpoint
+      const response = await productAPI.getAllProducts();
+
+      console.log('✅ API Response status:', response.status);
+      console.log('📊 Products count:', response.data.length);
+
+      // Transform data từ Spring Boot response
+      const products: FoodItem[] = response.data.map((product: any) => {
+        console.log('Processing product:', product.id, product.name);
+
+        return {
+          id: product.id,
+          name: product.name || 'Không có tên',
+          description: product.description || '',
+          price: product.price || 0,
+          rating: product.rating || 4.0,
+          imageUrl: product.imageUrl || 'https://via.placeholder.com/300',
+          category: product.category?.name || 'Món ăn',
+          available: product.stockQuantity > 0, // Dựa vào stock
+          stockQuantity: product.stockQuantity || 0,
+        };
+      });
+
+      console.log(`🎉 Loaded ${products.length} products successfully`);
+      setFoodItems(products);
+      setFilteredFoodItems(products);
+
+    } catch (error: any) {
+      console.error('❌ Error fetching products:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+
+      setLoadingError('Không thể tải sản phẩm. Vui lòng thử lại sau.');
+
+      // Fallback data
+      const fallbackItems: FoodItem[] = [
+        {
+          id: 1,
+          name: 'Soup Bumil',
+          price: 289000,
+          rating: 4.1,
+          imageUrl: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop',
+          category: 'Soup',
+          available: true,
+          stockQuantity: 10,
+        },
+        {
+          id: 2,
+          name: 'Grilled Chicken',
+          price: 4509000,
+          rating: 4.7,
+          imageUrl: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=400&h=300&fit=crop',
+          category: 'Chicken',
+          available: true,
+          stockQuantity: 5,
+        },
+      ];
+
+      setFoodItems(fallbackItems);
+      setFilteredFoodItems(fallbackItems);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProducts();
+  };
 
   // Tự động lướt Popular Restaurants
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveRestaurantIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % popularRestaurants.length;
-
-        // Cuộn đến item tiếp theo
         if (flatListRef.current) {
           flatListRef.current.scrollToIndex({
             index: nextIndex,
@@ -182,19 +214,52 @@ export default function HomeScreen() {
             viewPosition: 0.5,
           });
         }
-
         return nextIndex;
       });
-    }, 3000); // Lướt sau mỗi 3 giây
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
 
   // Filter food items based on search query
-  const filteredFoodItems = foodItems.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredFoodItems(foodItems);
+    } else {
+      const filtered = foodItems.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredFoodItems(filtered);
+    }
+  }, [searchQuery, foodItems]);
+
+  // Tạo hàm handleFoodPress
+  const handleFoodPress = (item: FoodItem) => {
+    if (!item.available) {
+      alert('Sản phẩm này hiện không có sẵn');
+      return;
+    }
+
+    // Transform item for order screen
+    const orderItem = {
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      rating: item.rating || 4.0,
+      image: item.imageUrl,
+      category: item.category,
+      description: item.description,
+      available: item.available,
+    };
+
+    router.push({
+      pathname: '/order',
+      params: {
+        item: JSON.stringify(orderItem)
+      }
+    });
+  };
 
   // Render chỉ báo (dots) cho Popular Restaurants
   const renderPagination = () => {
@@ -251,9 +316,28 @@ export default function HomeScreen() {
     setSearchQuery(text);
   };
 
+  // Format price to Vietnamese Dong
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(price);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#FF6B35']}
+            tintColor="#FF6B35"
+          />
+        }
+      >
         {/* Header với Search và Location */}
         <View style={styles.header}>
           {/* Top Bar với Search */}
@@ -262,7 +346,7 @@ export default function HomeScreen() {
               <Feather name="search" size={20} color="#636E72" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search food, restaurants..."
+                placeholder="Tìm kiếm món ăn, nhà hàng..."
                 placeholderTextColor="#95A5A6"
                 value={searchQuery}
                 onChangeText={handleSearch}
@@ -285,23 +369,19 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Location và Welcome */}
+          {/* Welcome */}
           <View style={styles.welcomeContainer}>
-            <View style={styles.locationContainer}>
-              <MaterialIcons name="location-on" size={18} color="#FF6B35" />
-              <Text style={styles.locationText}>Jakarta, Indonesia</Text>
-            </View>
-            <Text style={styles.welcomeTitle}>Hi, Food Lover!</Text>
-            <Text style={styles.welcomeSubtitle}>What would you like to eat today?</Text>
+            <Text style={styles.welcomeTitle}>Xin chào, Thực khách!</Text>
+            <Text style={styles.welcomeSubtitle}>Hôm nay bạn muốn ăn gì?</Text>
           </View>
         </View>
 
         {/* Popular Restaurants với Auto Scroll */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Popular Restaurants</Text>
+            <Text style={styles.sectionTitle}>Nhà hàng nổi bật</Text>
             <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
             </TouchableOpacity>
           </View>
 
@@ -330,11 +410,14 @@ export default function HomeScreen() {
         {/* Food Categories */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Food Categories</Text>
+            <Text style={styles.sectionTitle}>Danh mục món ăn</Text>
             {searchQuery.length > 0 && (
               <Text style={styles.searchResultText}>
-                {filteredFoodItems.length} results found
+                Tìm thấy {filteredFoodItems.length} kết quả
               </Text>
+            )}
+            {loadingError && (
+              <Text style={styles.errorText}>{loadingError}</Text>
             )}
           </View>
 
@@ -358,64 +441,75 @@ export default function HomeScreen() {
             ))}
           </View>
 
+          {/* Loading State */}
+          {loading && !refreshing && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF6B35" />
+              <Text style={styles.loadingText}>Đang tải món ăn...</Text>
+            </View>
+          )}
+
           {/* Food Items Grid */}
-          <View style={styles.foodGrid}>
-            {filteredFoodItems.length > 0 ? (
-              filteredFoodItems.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.foodCard}>
-                  <View style={styles.foodImageContainer}>
-                    <Image source={{ uri: item.image }} style={styles.foodImage} />
-                    <TouchableOpacity style={styles.favoriteButton}>
-                      <Ionicons name="heart" size={18} color="#FF6B35" />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.foodInfo}>
-                    <Text style={styles.foodName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.foodCategory}>{item.category}</Text>
-                    <View style={styles.foodBottom}>
-                      <Text style={styles.foodPrice}>{item.price}</Text>
-                      <View style={styles.foodRating}>
-                        <Ionicons name="star" size={14} color="#FF6B35" />
-                        <Text style={styles.ratingNumber}>{item.rating}</Text>
+          {!loading && (
+            <View style={styles.foodGrid}>
+              {filteredFoodItems.length > 0 ? (
+                filteredFoodItems.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.foodCard, !item.available && styles.unavailableCard]}
+                    onPress={() => handleFoodPress(item)}
+                    disabled={!item.available}
+                  >
+                    {!item.available && (
+                      <View style={styles.unavailableOverlay}>
+                        <Text style={styles.unavailableText}>Hết hàng</Text>
+                      </View>
+                    )}
+                    <View style={styles.foodImageContainer}>
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        style={styles.foodImage}
+                        onError={() => {
+                          console.log('Image load error for:', item.imageUrl);
+                          // Không thể thay đổi source trực tiếp, cần xử lý khác
+                        }}
+                      />
+                      <TouchableOpacity style={styles.favoriteButton}>
+                        <Ionicons name="heart" size={18} color="#FF6B35" />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.foodInfo}>
+                      <Text style={styles.foodName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.foodCategory}>{item.category}</Text>
+                      <View style={styles.foodBottom}>
+                        <Text style={styles.foodPrice}>{formatPrice(item.price)}</Text>
+                        {item.rating && (
+                          <View style={styles.foodRating}>
+                            <Ionicons name="star" size={14} color="#FF6B35" />
+                            <Text style={styles.ratingNumber}>{item.rating.toFixed(1)}</Text>
+                          </View>
+                        )}
                       </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))
-            ) : searchQuery.length > 0 ? (
-              <View style={styles.noResultsContainer}>
-                <Feather name="search" size={48} color="#E9ECEF" />
-                <Text style={styles.noResultsText}>No food items found</Text>
-                <Text style={styles.noResultsSubtext}>Try a different search term</Text>
-              </View>
-            ) : (
-              foodItems.map((item) => (
-                <TouchableOpacity key={item.id} style={styles.foodCard}>
-                  <View style={styles.foodImageContainer}>
-                    <Image source={{ uri: item.image }} style={styles.foodImage} />
-                    <TouchableOpacity style={styles.favoriteButton}>
-                      <Ionicons name="heart" size={18} color="#FF6B35" />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.foodInfo}>
-                    <Text style={styles.foodName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.foodCategory}>{item.category}</Text>
-                    <View style={styles.foodBottom}>
-                      <Text style={styles.foodPrice}>{item.price}</Text>
-                      <View style={styles.foodRating}>
-                        <Ionicons name="star" size={14} color="#FF6B35" />
-                        <Text style={styles.ratingNumber}>{item.rating}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
+                  </TouchableOpacity>
+                ))
+              ) : searchQuery.length > 0 ? (
+                <View style={styles.noResultsContainer}>
+                  <Feather name="search" size={48} color="#E9ECEF" />
+                  <Text style={styles.noResultsText}>Không tìm thấy món ăn</Text>
+                  <Text style={styles.noResultsSubtext}>Thử từ khóa tìm kiếm khác</Text>
+                </View>
+              ) : (
+                <View style={styles.noResultsContainer}>
+                  <Ionicons name="fast-food-outline" size={48} color="#E9ECEF" />
+                  <Text style={styles.noResultsText}>Chưa có món ăn nào</Text>
+                  <Text style={styles.noResultsSubtext}>Vui lòng thử lại sau</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -500,16 +594,6 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     marginBottom: 10,
   },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#636E72',
-    marginLeft: 6,
-  },
   welcomeTitle: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -542,6 +626,11 @@ const styles = StyleSheet.create({
   searchResultText: {
     fontSize: 12,
     color: '#95A5A6',
+    fontStyle: 'italic',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#FF3B30',
     fontStyle: 'italic',
   },
   carouselContainer: {
@@ -639,6 +728,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#636E72',
+  },
   foodGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -655,6 +754,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    position: 'relative',
+  },
+  unavailableCard: {
+    opacity: 0.7,
+  },
+  unavailableOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  unavailableText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   foodImageContainer: {
     position: 'relative',
