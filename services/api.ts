@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 const api = axios.create({
@@ -6,6 +7,14 @@ const api = axios.create({
         'Content-Type': 'application/json',
     },
     timeout: 15000,
+});
+
+api.interceptors.request.use(async config => {
+    const token = await AsyncStorage.getItem('jwtToken');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
 });
 
 export default api;
