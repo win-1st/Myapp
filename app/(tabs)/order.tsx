@@ -1,28 +1,106 @@
-import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
 import {
-    Image,
+    ActivityIndicator,
+    FlatList,
     SafeAreaView,
     StyleSheet,
     Text,
-    TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+import { orderAPI } from '../../services/orderAPI';
+type Product = {
+    id: number;
+    name: string;
+    price: number;
+};
 
+type OrderItem = {
+    id: number;
+    product: Product;
+    quantity: number;
+    subtotal: number;
+};
+
+type Order = {
+    id: number;
+    totalAmount: number;
+};
 export default function OrderScreen() {
+    const [order, setOrder] = useState<Order | null>(null);
+    const [items, setItems] = useState<OrderItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadOrder();
+    }, []);
+
+    const loadOrder = async () => {
+        try {
+            const orderIdStr = await AsyncStorage.getItem("currentOrderId");
+
+            if (!orderIdStr) {
+                setLoading(false);
+                return;
+            }
+
+            const orderId = parseInt(orderIdStr);   // 👈 convert string → number
+
+            const res = await orderAPI.getOrder(orderId);
+
+            setOrder(res.data.order);
+            setItems(res.data.items);
+
+        } catch (e) {
+            console.log("❌ Load order error", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.center}>
+                <ActivityIndicator size="large" />
+            </SafeAreaView>
+        );
+    }
+
+    if (!items.length) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <Text style={styles.emptyText}>🛒 Giỏ hàng trống</Text>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                <Image
-                    source={{ uri: 'https://via.placeholder.com/200x200' }}
-                    style={styles.emptyImage}
-                />
-                <Text style={styles.title}>Ouch! Hungry</Text>
-                <Text style={styles.subtitle}>Seems like you have not</Text>
-                <Text style={styles.subtitle}>ordered any food yet</Text>
+            <Text style={styles.header}>🛒 Giỏ hàng</Text>
 
-                <TouchableOpacity style={styles.button}>
-                    <Text style={styles.buttonText}>Find Foods</Text>
-                </TouchableOpacity>
+            <FlatList
+                data={items}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                    <View style={styles.item}>
+                        <Text style={styles.itemName}>{item.product.name}</Text>
+
+                        <Text style={styles.itemQuantity}>
+                            Số lượng: {item.quantity}
+                        </Text>
+
+                        <Text style={styles.itemPrice}>
+                            {item.subtotal.toLocaleString()} đ
+                        </Text>
+                    </View>
+                )}
+            />
+
+            <View style={styles.totalBox}>
+                <Text style={styles.totalText}>
+                    Tổng cộng: {order?.totalAmount?.toLocaleString() ?? "0"} đ
+                </Text>
             </View>
         </SafeAreaView>
     );
@@ -31,42 +109,72 @@ export default function OrderScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: "#f9f9f9",
+        padding: 16
     },
-    content: {
+
+    center: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 40,
+        justifyContent: "center",
+        alignItems: "center"
     },
-    emptyImage: {
-        width: 200,
-        height: 200,
-        marginBottom: 32,
+
+    header: {
+        fontSize: 24,
+        fontWeight: "bold",
+        marginBottom: 16,
+        color: "#333"
     },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#000',
+
+    emptyText: {
+        textAlign: "center",
+        marginTop: 50,
+        fontSize: 18,
+        color: "#888"
+    },
+
+    item: {
+        backgroundColor: "#fff",
+        padding: 14,
+        borderRadius: 10,
         marginBottom: 12,
-        textAlign: 'center',
+        shadowColor: "#000",
+        shadowOpacity: 0.05,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2
     },
-    subtitle: {
+
+    itemName: {
         fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 22,
+        fontWeight: "600",
+        marginBottom: 4
     },
-    button: {
-        backgroundColor: '#FF6B35',
+
+    itemQuantity: {
+        fontSize: 14,
+        color: "#555"
+    },
+
+    itemPrice: {
+        fontSize: 15,
+        fontWeight: "bold",
+        marginTop: 6,
+        color: "#E53935"
+    },
+
+    totalBox: {
+        marginTop: 16,
+        padding: 16,
+        backgroundColor: "#fff",
         borderRadius: 12,
-        paddingHorizontal: 32,
-        paddingVertical: 16,
-        marginTop: 32,
+        borderTopWidth: 1,
+        borderColor: "#eee"
     },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
+
+    totalText: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#000",
+        textAlign: "right"
+    }
 });

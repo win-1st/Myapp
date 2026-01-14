@@ -16,6 +16,7 @@ import { saveAuth } from '../utils/authStorage';
 export default function SignIn() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false); // Thêm state này
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -59,6 +60,7 @@ export default function SignIn() {
             };
 
             await saveAuth(authData);
+
             redirectByRole(data.roles || []);
 
         } catch (err: any) {
@@ -67,6 +69,11 @@ export default function SignIn() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Hàm toggle ẩn/hiện mật khẩu
+    const toggleShowPassword = () => {
+        setShowPassword(!showPassword);
     };
 
     return (
@@ -100,10 +107,22 @@ export default function SignIn() {
                     placeholder="Mật khẩu"
                     value={password}
                     onChangeText={setPassword}
-                    secureTextEntry
+                    secureTextEntry={!showPassword} // Điều khiển ẩn/hiện
                     editable={!loading}
                     placeholderTextColor="#999"
                 />
+                {/* Nút toggle ẩn/hiện mật khẩu */}
+                <TouchableOpacity
+                    onPress={toggleShowPassword}
+                    style={styles.passwordToggle}
+                    disabled={loading}
+                >
+                    <Ionicons
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={22}
+                        color="#666"
+                    />
+                </TouchableOpacity>
             </View>
 
             <TouchableOpacity
@@ -167,6 +186,10 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         fontSize: 16,
         color: '#333',
+    },
+    passwordToggle: {
+        padding: 8,
+        marginLeft: 8,
     },
     button: {
         backgroundColor: '#FF6B35',
