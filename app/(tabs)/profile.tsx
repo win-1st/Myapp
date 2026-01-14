@@ -1,14 +1,16 @@
+import { router } from "expo-router";
 import React from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  ScrollView,
-  SafeAreaView,
+  Alert,
   Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View
 } from 'react-native';
-
+import { clearAuth } from "../../utils/authStorage";
 export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
@@ -52,6 +54,25 @@ export default function ProfileScreen() {
             <Text style={styles.menuText}>Payments</Text>
             <Text style={styles.menuArrow}>{'>'}</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: "#FEF2F2" }]}
+            onPress={() => {
+              Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
+                { text: "Hủy" },
+                {
+                  text: "Đăng xuất",
+                  style: "destructive",
+                  onPress: async () => {
+                    await clearAuth();
+                    router.replace("/signin");
+                  },
+                },
+              ]);
+            }}
+          >
+            <Text style={{ color: "#DC2626", fontSize: 16 }}>Đăng xuất</Text>
+          </TouchableOpacity>
+
         </View>
       </ScrollView>
     </SafeAreaView>

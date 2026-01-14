@@ -47,18 +47,7 @@ export default function WelcomeScreen() {
     // Load animation data
     useEffect(() => {
         if (isWeb && LottieComponent) {
-            // Trên web, có thể dùng URL trực tiếp
-            // OPTION 1: Dùng URL từ internet (đơn giản nhất)
-            // fetch('https://assets5.lottiefiles.com/packages/lf20_p8bfn5to.json') // Food animation example
-            //  .then(response => response.json())
-            //    .then(data => {
-            //       setAnimationData(data);
-            //   })
-            //    .catch(error => {
-            //       console.log('Error loading Lottie from URL:', error);
-            //       setUseFallback(true);
-            //  });
-
+           
             // OPTION 2: Từ file local (phức tạp hơn)
             import('../assets/animations/welcome.json')
                 .then(data => {

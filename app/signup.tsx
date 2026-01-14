@@ -104,7 +104,7 @@ export default function SignUp() {
             console.log('📤 REGISTER PAYLOAD:', payload);
 
             // Gọi API register
-            const res = await api.post('/auth/register', payload);
+            const res = await api.post('/api/auth/register', payload);
 
             console.log('✅ REGISTER SUCCESS:', res.data);
 
@@ -123,7 +123,7 @@ export default function SignUp() {
                         onPress: async () => {
                             try {
                                 // Auto login với tài khoản vừa tạo
-                                const loginRes = await api.post('/auth/login', {
+                                const loginRes = await api.post('/api/auth/login', {
                                     username,
                                     password
                                 });

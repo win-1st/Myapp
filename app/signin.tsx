@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import api from "../services/api";
 import { saveAuth } from '../utils/authStorage';
 
 export default function SignIn() {
@@ -31,60 +32,38 @@ export default function SignIn() {
     };
 
     const handleSignIn = async () => {
-        if (!username || !password) {
-            setError('Vui lòng nhập đầy đủ thông tin');
-            return;
-        }
-
         try {
             setLoading(true);
-            setError('');
+            setError("");
 
-            console.log('📤 LOGIN PAYLOAD:', { username, password });
+            console.log("📤 LOGIN PAYLOAD:", { username, password });
 
-            const res = await fetch(
-                'https://javatest-production-2db4.up.railway.app/api/auth/login',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username,
-                        password,
-                    }),
-                }
-            );
+            const res = await api.post("/api/auth/login", {
+                username,
+                password,
+            });
 
-            const data = await res.json();
+            const data = res.data;
 
-            if (!res.ok) {
-                throw new Error(data.message || 'Đăng nhập thất bại');
-            }
+            console.log("✅ LOGIN SUCCESS:", data);
 
-            console.log('✅ LOGIN SUCCESS:', data);
-
-            // Tạo object auth data với đầy đủ thông tin
             const authData = {
                 token: data.token || data.accessToken,
                 user: {
                     id: data.id,
                     username: data.username,
-                    fullName: data.fullName, // Lấy từ backend
+                    fullName: data.fullName,
                     email: data.email,
-                    roles: data.roles || []
-                }
+                    roles: data.roles || [],
+                },
             };
 
             await saveAuth(authData);
-
-            // Chuyển hướng dựa trên role
             redirectByRole(data.roles || []);
 
         } catch (err: any) {
-            console.log('❌ LOGIN ERROR:', err.message);
-            setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+            console.log("❌ LOGIN ERROR:", err.message);
+            setError("Sai tài khoản hoặc mật khẩu");
         } finally {
             setLoading(false);
         }

@@ -18,9 +18,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { productAPI } from '../../services/api';
+import { API_BASE } from "../../services/api";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');   // chỉnh path cho đúng
 
 // Type definitions
 interface Restaurant {
@@ -38,6 +38,7 @@ interface FoodItem {
   rating?: number;
   imageUrl: string;
   category: string;
+  categoryId?: string;
   description?: string;
   available: boolean;
   stockQuantity: number;
@@ -46,8 +47,8 @@ interface FoodItem {
 interface Category {
   id: string;
   name: string;
-  active: boolean;
 }
+
 
 // Props interface cho RestaurantCard
 interface RestaurantCardProps {
@@ -74,7 +75,6 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ item, isActive }) => {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState<string>('1');
   const [activeRestaurantIndex, setActiveRestaurantIndex] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
@@ -110,87 +110,76 @@ export default function HomeScreen() {
     },
   ];
 
-  const categories: Category[] = [
-    { id: '1', name: 'Mới nhất', active: true },
-    { id: '2', name: 'Phổ biến', active: false },
-    { id: '3', name: 'Gợi ý', active: false },
-  ];
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("all");
 
   // Fetch products từ API
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
 
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/customer/categories`);
+      const data = await res.json();
+
+      const all = { id: "all", name: "Tất cả" };
+
+      setCategories([all, ...data]);
+    } catch (err) {
+      console.log("❌ Category load error:", err);
+    }
+  };
+
+
   // Trong HomeScreen.tsx - CHỈ SỬA PHẦN fetchProducts
+  // HomeScreen.tsx - Sử dụng fetch thay vì axios
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setLoadingError(null);
 
-      console.log('🔄 Fetching products from Spring Boot...');
+      const url = `${API_BASE}/api/customer/products`;
 
-      // Gọi đúng endpoint
-      const response = await productAPI.getAllProducts();
+      console.log("🔌 Fetching:", url);
 
-      console.log('✅ API Response status:', response.status);
-      console.log('📊 Products count:', response.data.length);
-
-      // Transform data từ Spring Boot response
-      const products: FoodItem[] = response.data.map((product: any) => {
-        console.log('Processing product:', product.id, product.name);
-
-        return {
-          id: product.id,
-          name: product.name || 'Không có tên',
-          description: product.description || '',
-          price: product.price || 0,
-          rating: product.rating || 4.0,
-          imageUrl: product.imageUrl || 'https://via.placeholder.com/300',
-          category: product.category?.name || 'Món ăn',
-          available: product.stockQuantity > 0, // Dựa vào stock
-          stockQuantity: product.stockQuantity || 0,
-        };
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
       });
 
-      console.log(`🎉 Loaded ${products.length} products successfully`);
-      setFoodItems(products);
-      setFilteredFoodItems(products);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-    } catch (error: any) {
-      console.error('❌ Error fetching products:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-      });
+      const data = await response.json();
 
-      setLoadingError('Không thể tải sản phẩm. Vui lòng thử lại sau.');
+      const transformedItems: FoodItem[] = data.map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        rating: 4.5,
+        imageUrl: product.imageUrl
+          ? `${API_BASE}${product.imageUrl}`
+          : "https://source.unsplash.com/random/400x300/?food",
+        category: product.category?.name || "Food",
+        categoryId: product.category?.id?.toString(),   // 👈 QUAN TRỌNG
+        description: product.description || "",
+        available: product.stockQuantity > 0,
+        stockQuantity: product.stockQuantity,
+      }));
 
-      // Fallback data
-      const fallbackItems: FoodItem[] = [
-        {
-          id: 1,
-          name: 'Soup Bumil',
-          price: 289000,
-          rating: 4.1,
-          imageUrl: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop',
-          category: 'Soup',
-          available: true,
-          stockQuantity: 10,
-        },
-        {
-          id: 2,
-          name: 'Grilled Chicken',
-          price: 4509000,
-          rating: 4.7,
-          imageUrl: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=400&h=300&fit=crop',
-          category: 'Chicken',
-          available: true,
-          stockQuantity: 5,
-        },
-      ];
 
-      setFoodItems(fallbackItems);
-      setFilteredFoodItems(fallbackItems);
+      setFoodItems(transformedItems);
+      setFilteredFoodItems(transformedItems);
+
+    } catch (err: any) {
+      console.error("❌ Fetch failed:", err.message);
+      setLoadingError("Không thể kết nối server");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -221,18 +210,25 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter food items based on search query
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredFoodItems(foodItems);
-    } else {
-      const filtered = foodItems.filter(item =>
+    let data = foodItems;
+
+    // Filter by category
+    if (activeCategory !== "all") {
+      data = data.filter(item => item.categoryId === activeCategory);
+    }
+
+    // Filter by search
+    if (searchQuery.trim() !== "") {
+      data = data.filter(item =>
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.category.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredFoodItems(filtered);
     }
-  }, [searchQuery, foodItems]);
+
+    setFilteredFoodItems(data);
+  }, [searchQuery, foodItems, activeCategory]);
+
 
   // Tạo hàm handleFoodPress
   const handleFoodPress = (item: FoodItem) => {
@@ -421,7 +417,7 @@ export default function HomeScreen() {
             )}
           </View>
 
-          <View style={styles.categoryTabs}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryTabs}>
             {categories.map((category) => (
               <TouchableOpacity
                 key={category.id}
@@ -439,7 +435,7 @@ export default function HomeScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
           {/* Loading State */}
           {loading && !refreshing && (
@@ -512,7 +508,7 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 

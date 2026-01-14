@@ -1,23 +1,29 @@
-// services/api.ts - SỬA LẠI HOÀN TOÀN
-import axios from 'axios';
+import axios from "axios";
+import Constants from "expo-constants";
 
-// SPRING BOOT API BASE URL
-const SPRING_BOOT_API = 'https://javatest-production-2db4.up.railway.app';
+function getBaseUrl() {
+    const host = Constants.expoConfig?.hostUri?.split(":")[0];
+    if (!host) return "http://localhost:8080";
+    return `http://${host}:8080`;  // Sửa: dùng backticks thay vì string thường
+}
 
-// Tạo axios instance
+export const API_BASE = getBaseUrl();
+console.log("🌍 API BASE =", API_BASE);
+
 const api = axios.create({
-    baseURL: SPRING_BOOT_API,
+    baseURL: API_BASE,
     timeout: 15000,
     headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        "Content-Type": "application/json",
+        Accept: "application/json",
     },
 });
 
 // Debug interceptors
 api.interceptors.request.use(
     (config) => {
-        console.log(`🚀 Request: ${config.baseURL}${config.url}`);
+        console.log(`🚀 Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+        console.log('📦 Request Data:', config.data);
         return config;
     },
     (error) => {
@@ -29,82 +35,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => {
         console.log(`✅ Response ${response.status}: ${response.config.url}`);
+        console.log('📊 Response Data:', response.data);
         return response;
     },
     (error) => {
         console.error('❌ API Error:', {
             url: error.config?.url,
+            method: error.config?.method,
             status: error.response?.status,
             data: error.response?.data,
             message: error.message,
+            code: error.code,
         });
         return Promise.reject(error);
     }
 );
-
-// Product API - DÙNG ĐÚNG ENDPOINT /api/admin/products
-export const productAPI = {
-    // Lấy tất cả sản phẩm từ ADMIN endpoint
-    getAllProducts: () => api.get('/api/admin/products'),
-
-    // Lấy sản phẩm theo ID
-    getProductById: (id: number) => api.get(`/api/admin/products/${id}`),
-
-    // Các API khác
-    searchProducts: (keyword: string) =>
-        api.get(`/api/admin/products/search?keyword=${keyword}`),
-
-    getProductsByCategory: (categoryId: number) =>
-        api.get(`/api/admin/products/category/${categoryId}`),
-
-    // Tạo sản phẩm mới (nếu cần)
-    createProduct: (productData: any) =>
-        api.post('/api/admin/products', productData),
-
-    // Cập nhật sản phẩm
-    updateProduct: (id: number, productData: any) =>
-        api.put(`/api/admin/products/${id}`, productData),
-
-    // Xóa sản phẩm
-    deleteProduct: (id: number) =>
-        api.delete(`/api/admin/products/${id}`),
-};
-
-// Category API
-export const categoryAPI = {
-    getAllCategories: () => api.get('/api/admin/categories'),
-    getCategoryById: (id: number) => api.get(`/api/admin/categories/${id}`),
-};
-
-// Order API
-export const orderAPI = {
-    createOrder: (orderData: any) => api.post('/orders', orderData),
-    getAllOrders: () => api.get('/orders'),
-    getOrderById: (id: number) => api.get(`/orders/${id}`),
-};
-
-// Test connection
-export const testConnection = async () => {
-    console.log('🔍 Testing Spring Boot connection...');
-
-    const endpoints = [
-        '/api/admin/products',      // Chính xác endpoint của bạn
-        '/api/admin/categories',    // Categories endpoint
-        '/',                       // Root endpoint
-        '/actuator/health',        // Health check
-    ];
-
-    for (const endpoint of endpoints) {
-        try {
-            const response = await api.get(endpoint);
-            console.log(`✅ ${endpoint} - Status: ${response.status}`);
-            if (endpoint === '/api/admin/products') {
-                console.log('📦 Products data sample:', response.data?.slice(0, 2));
-            }
-        } catch (err: any) {
-            console.log(`❌ ${endpoint} - Error: ${err.response?.status || err.message}`);
-        }
-    }
-};
 
 export default api;
