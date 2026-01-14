@@ -127,7 +127,12 @@ export default function HomeScreen() {
 
       const all = { id: "all", name: "Tất cả" };
 
-      setCategories([all, ...data]);
+      const normalized = data.map((c: any) => ({
+        id: c.id.toString(),   // 👈 convert sang string
+        name: c.name,
+      }));
+
+      setCategories([all, ...normalized]);
     } catch (err) {
       console.log("❌ Category load error:", err);
     }
