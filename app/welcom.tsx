@@ -47,7 +47,6 @@ export default function WelcomeScreen() {
     // Load animation data
     useEffect(() => {
         if (isWeb && LottieComponent) {
-           
             // OPTION 2: Từ file local (phức tạp hơn)
             import('../assets/animations/welcome.json')
                 .then(data => {
@@ -60,6 +59,14 @@ export default function WelcomeScreen() {
         }
     }, []);
 
+    // Xử lý navigation khi timeLeft = 0
+    useEffect(() => {
+        if (timeLeft === 0) {
+            router.replace('/signin');
+        }
+    }, [timeLeft]);
+
+    // Animation và timer
     useEffect(() => {
         // Animation khi mở màn hình
         Animated.parallel([
@@ -80,22 +87,20 @@ export default function WelcomeScreen() {
             }),
         ]).start();
 
-        // Timer đếm ngược
+        // Timer đếm ngược - ĐÃ SỬA: KHÔNG gọi router.replace trong đây
         const countdown = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
-                    clearInterval(countdown);
-                    router.replace('/signin');
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
 
-        // Tự động chuyển trang sau 3 giây
+        // Tự động chuyển trang sau 3 giây (dự phòng nếu có lỗi)
         const timeout = setTimeout(() => {
             router.replace('/signin');
-        }, 4000);
+        }, 3000);
 
         return () => {
             clearInterval(countdown);
@@ -309,10 +314,10 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        width: '100%', // Giữ width 100% nhưng animate bằng scaleX
+        width: '100%',
         backgroundColor: 'rgba(255, 107, 53, 0.2)',
         borderRadius: 20,
-        transformOrigin: 'left center', // Quan trọng: scale từ trái sang
+        transformOrigin: 'left center',
     },
     skipText: {
         fontSize: 14,

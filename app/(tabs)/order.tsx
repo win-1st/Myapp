@@ -17,8 +17,8 @@ type Product = {
 
 type OrderItem = {
     id: number;
-    product: Product;
     quantity: number;
+    price: number;
     subtotal: number;
 };
 
@@ -40,16 +40,20 @@ export default function OrderScreen() {
             const orderIdStr = await AsyncStorage.getItem("currentOrderId");
 
             if (!orderIdStr) {
+                console.log("❌ No currentOrderId in storage");
                 setLoading(false);
                 return;
             }
 
-            const orderId = parseInt(orderIdStr);   // 👈 convert string → number
+            const orderId = parseInt(orderIdStr);
+            console.log("📦 Loading order:", orderId);
 
             const res = await orderAPI.getOrder(orderId);
 
+            console.log("🧾 ORDER API RESPONSE:", JSON.stringify(res.data, null, 2));
+
             setOrder(res.data.order);
-            setItems(res.data.items);
+            setItems(res.data.items || []);
 
         } catch (e) {
             console.log("❌ Load order error", e);
@@ -57,7 +61,6 @@ export default function OrderScreen() {
             setLoading(false);
         }
     };
-
 
     if (loading) {
         return (
@@ -84,7 +87,7 @@ export default function OrderScreen() {
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={({ item }) => (
                     <View style={styles.item}>
-                        <Text style={styles.itemName}>{item.product.name}</Text>
+                        <Text style={styles.itemName}>Sản phẩm #{item.id}</Text>
 
                         <Text style={styles.itemQuantity}>
                             Số lượng: {item.quantity}

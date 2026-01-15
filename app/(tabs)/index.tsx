@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { API_BASE } from "../../services/api";
+import api, { API_BASE } from "../../services/api";
 
 const { width: screenWidth } = Dimensions.get('window');   // chỉnh path cho đúng
 
@@ -119,16 +119,14 @@ export default function HomeScreen() {
     fetchCategories();
   }, []);
 
-
   const fetchCategories = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/customer/categories`);
-      const data = await res.json();
+      const res = await api.get("/api/customer/categories"); // 🔥 có token
 
       const all = { id: "all", name: "Tất cả" };
 
-      const normalized = data.map((c: any) => ({
-        id: c.id.toString(),   // 👈 convert sang string
+      const normalized = res.data.map((c: any) => ({
+        id: c.id.toString(),
         name: c.name,
       }));
 
@@ -139,6 +137,7 @@ export default function HomeScreen() {
   };
 
 
+
   // Trong HomeScreen.tsx - CHỈ SỬA PHẦN fetchProducts
   // HomeScreen.tsx - Sử dụng fetch thay vì axios
   const fetchProducts = async () => {
@@ -146,22 +145,11 @@ export default function HomeScreen() {
       setLoading(true);
       setLoadingError(null);
 
-      const url = `${API_BASE}/api/customer/products`;
+      console.log("🔌 Fetching products...");
 
-      console.log("🔌 Fetching:", url);
+      const res = await api.get("/api/customer/products"); // 🔥 có token
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = res.data;
 
       const transformedItems: FoodItem[] = data.map((product: any) => ({
         id: product.id,
@@ -172,24 +160,23 @@ export default function HomeScreen() {
           ? `${API_BASE}${product.imageUrl}`
           : "https://source.unsplash.com/random/400x300/?food",
         category: product.category?.name || "Food",
-        categoryId: product.category?.id?.toString(),   // 👈 QUAN TRỌNG
+        categoryId: product.category?.id?.toString(),
         description: product.description || "",
         available: product.stockQuantity > 0,
         stockQuantity: product.stockQuantity,
       }));
 
-
       setFoodItems(transformedItems);
       setFilteredFoodItems(transformedItems);
-
     } catch (err: any) {
-      console.error("❌ Fetch failed:", err.message);
-      setLoadingError("Không thể kết nối server");
+      console.error("❌ Product load failed:", err?.response?.status, err?.message);
+      setLoadingError("Không thể tải danh sách sản phẩm");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
 
   const onRefresh = async () => {
     setRefreshing(true);

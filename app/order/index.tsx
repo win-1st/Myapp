@@ -100,21 +100,24 @@ export default function DetailScreen() {
         try {
             setIsLoading(true);
 
-            let orderId: number | null = currentOrderId;
+            let orderId = currentOrderId;
 
-            // Nếu chưa có order → tạo mới
             if (!orderId) {
                 const res = await orderAPI.createOrder();
+                console.log("🧾 Create order response:", res.data);
 
-                const newOrderId = res.data.id;   // 🔥 lấy id mới
+                orderId = res.data.orderId;   // 🔥 gán lại biến ngoài
 
-                await AsyncStorage.setItem("currentOrderId", newOrderId.toString());
-                setCurrentOrderId(newOrderId);
+                if (!orderId) {
+                    Alert.alert("Lỗi", "Không tạo được đơn hàng");
+                    return;
+                }
 
-                orderId = newOrderId;   // 🔥 gán lại
+                await AsyncStorage.setItem("currentOrderId", orderId.toString());
+                setCurrentOrderId(orderId);
             }
 
-            // 🔥 Tới đây orderId chắc chắn là number
+            // 🔥 Đảm bảo orderId là number
             await orderAPI.addItemToOrder(orderId, foodItem.id, quantity);
 
             Alert.alert("✅ Thành công", "Đã thêm vào giỏ hàng");
