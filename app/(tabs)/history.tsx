@@ -1,66 +1,114 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
     SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+import { orderAPI } from '../../services/orderAPI';
 
-const orders = [
-    {
-        id: '1',
-        date: '12 Jan 2026',
-        total: 'IDR 289,000',
-        status: 'Delivered',
-    },
-    {
-        id: '2',
-        date: '10 Jan 2026',
-        total: 'IDR 150,000',
-        status: 'Pending',
-    },
-];
+type OrderHistory = {
+    id: number;
+    totalAmount: number;
+    status: string;
+    createdAt: string;
+};
 
 export default function HistoryScreen() {
-    const renderItem = ({ item }: any) => (
+    const [orders, setOrders] = useState<OrderHistory[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadHistory();
+    }, []);
+
+    const loadHistory = async () => {
+        try {
+            const res = await orderAPI.getHistory();
+            console.log("📜 History:", res.data);
+
+            // backend trả về { orders: [...] }
+            setOrders(res.data.orders);
+        } catch (err) {
+            console.log("❌ Load history error", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDate = (d: string) =>
+        new Date(d).toLocaleDateString("vi-VN");
+
+    const formatMoney = (n: number) =>
+        n.toLocaleString("vi-VN") + " đ";
+
+    const renderItem = ({ item }: { item: OrderHistory }) => (
         <TouchableOpacity style={styles.card}>
             <View style={styles.row}>
-                <Text style={styles.orderId}>Order #{item.id}</Text>
+                <Text style={styles.orderId}>Đơn #{item.id}</Text>
                 <Text
                     style={[
                         styles.status,
-                        item.status === 'Delivered'
+                        item.status === "DELIVERED"
                             ? styles.delivered
-                            : styles.pending,
+                            : styles.pending
                     ]}
                 >
-                    {item.status}
+                    {item.status === "DELIVERED"
+                        ? "Đã thanh toán"
+                        : item.status === "CONFIRMED"
+                            ? "Chờ thanh toán"
+                            : "Đang xử lý"}
                 </Text>
             </View>
 
-            <Text style={styles.date}>{item.date}</Text>
+            <Text style={styles.date}>
+                {formatDate(item.createdAt)}
+            </Text>
 
             <View style={styles.row}>
-                <Text style={styles.total}>{item.total}</Text>
+                <Text style={styles.total}>
+                    {formatMoney(item.totalAmount)}
+                </Text>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
             </View>
         </TouchableOpacity>
     );
 
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <ActivityIndicator size="large" />
+            </SafeAreaView>
+        );
+    }
+
+    if (!orders.length) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <Text style={{ textAlign: "center", marginTop: 40 }}>
+                    Chưa có đơn hàng nào
+                </Text>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <FlatList
                 data={orders}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.id.toString()}
                 renderItem={renderItem}
                 contentContainerStyle={{ padding: 20 }}
             />
         </SafeAreaView>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
