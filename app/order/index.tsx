@@ -130,9 +130,6 @@ export default function DetailScreen() {
             setIsLoading(false);
         }
     };
-
-
-
     /* ================= UI ================= */
 
     const toggleExtra = (extra: string) => {

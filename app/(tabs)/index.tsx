@@ -136,8 +136,6 @@ export default function HomeScreen() {
     }
   };
 
-
-
   // Trong HomeScreen.tsx - CHỈ SỬA PHẦN fetchProducts
   // HomeScreen.tsx - Sử dụng fetch thay vì axios
   const fetchProducts = async () => {

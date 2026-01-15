@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -10,7 +11,6 @@ import {
     View
 } from 'react-native';
 import { orderAPI } from '../../services/orderAPI';
-
 type OrderHistory = {
     id: number;
     totalAmount: number;
@@ -21,6 +21,7 @@ type OrderHistory = {
 export default function HistoryScreen() {
     const [orders, setOrders] = useState<OrderHistory[]>([]);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         loadHistory();
@@ -47,7 +48,8 @@ export default function HistoryScreen() {
         n.toLocaleString("vi-VN") + " đ";
 
     const renderItem = ({ item }: { item: OrderHistory }) => (
-        <TouchableOpacity style={styles.card}>
+        <TouchableOpacity style={styles.card}
+            onPress={() => router.push(`/history/${item.id}`)}>
             <View style={styles.row}>
                 <Text style={styles.orderId}>Đơn #{item.id}</Text>
                 <Text
@@ -108,7 +110,6 @@ export default function HistoryScreen() {
         </SafeAreaView>
     );
 }
-
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },

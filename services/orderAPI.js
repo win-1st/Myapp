@@ -28,7 +28,7 @@ export const orderAPI = {
         }),
 
     removeItem: (orderId, productId) =>
-        api.delete(`/api/customer/orders/${orderId}/items/${productId}`)
+        api.delete(`/api/customer/orders/${orderId}/items/${productId}`),
 
     getHistory() {
         return api.get("/api/customer/orders");
