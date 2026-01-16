@@ -1,9 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     SafeAreaView,
@@ -12,9 +10,9 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
-
+import api from "../services/api";
 type ErrorState = {
     email: string;
     general: string;
@@ -47,47 +45,28 @@ export default function ForgotPassword() {
         }));
     };
 
-    const handleSendResetLink = async (): Promise<void> => {
-        // Validate email
+    const handleSendResetLink = async () => {
         const emailError = validateEmail(email);
-
         if (emailError) {
-            setErrors({
-                email: emailError,
-                general: ''
-            });
+            setErrors({ email: emailError, general: "" });
             return;
         }
 
         try {
             setLoading(true);
-            setErrors({ email: '', general: '' });
+            setErrors({ email: "", general: "" });
 
-            // Simulate API call (replace with actual API)
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await api.post("/api/auth/forgot-password", {
+                email: email
+            });
 
-            // Mock API response - replace with actual API
-            // In real app, you would send reset link to the email
             setSuccess(true);
-
-            // Show success message
-            Alert.alert(
-                'Thành công',
-                'Chúng tôi đã gửi link đặt lại mật khẩu đến email của bạn. Vui lòng kiểm tra hộp thư.',
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => router.back() // Quay lại trang đăng nhập
-                    }
-                ]
-            );
-
-        } catch (err) {
-            setErrors(prev => ({
-                ...prev,
-                general: 'Đã xảy ra lỗi. Vui lòng thử lại sau.'
-            }));
-            console.error('Forgot password error:', err);
+        } catch (err: any) {
+            if (err.response?.data) {
+                setErrors({ email: "", general: err.response.data });
+            } else {
+                setErrors({ email: "", general: "Không thể kết nối server" });
+            }
         } finally {
             setLoading(false);
         }
