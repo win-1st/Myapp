@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -8,52 +8,54 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
-} from 'react-native';
+  View,
+} from "react-native";
+import { authAPI } from "../../services/authAPI";
 import { clearAuth } from "../../utils/authStorage";
+
 export default function ProfileScreen() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const res = await authAPI.getMe();
+      setUser(res.data);
+    } catch (err) {
+      console.log("❌ Load profile failed", err);
+    }
+  };
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={{ textAlign: "center", marginTop: 50 }}>
+          Loading...
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <Image
-            source={{ uri: 'https://via.placeholder.com/80x80' }}
+            source={{ uri: "https://via.placeholder.com/80x80" }}
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>Angga Risky</Text>
-            <Text style={styles.email}>wepanda@gmail.com</Text>
+            <Text style={styles.name}>{user.fullName || user.username}</Text>
+            <Text style={styles.email}>{user.email}</Text>
           </View>
         </View>
 
-        {/* Account Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <Text style={styles.sectionSubtitle}>FoodMarket</Text>
-        </View>
-
-        {/* Menu Items */}
+        {/* Menu */}
         <View style={styles.menuSection}>
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Edit Profile</Text>
-            <Text style={styles.menuArrow}>{'>'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Home Address</Text>
-            <Text style={styles.menuArrow}>{'>'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Security</Text>
-            <Text style={styles.menuArrow}>{'>'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Payments</Text>
-            <Text style={styles.menuArrow}>{'>'}</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.menuItem, { backgroundColor: "#FEF2F2" }]}
             onPress={() => {
@@ -72,7 +74,6 @@ export default function ProfileScreen() {
           >
             <Text style={{ color: "#DC2626", fontSize: 16 }}>Đăng xuất</Text>
           </TouchableOpacity>
-
         </View>
       </ScrollView>
     </SafeAreaView>
