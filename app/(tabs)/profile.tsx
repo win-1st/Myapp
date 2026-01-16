@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -17,7 +18,18 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    loadProfile();
+    const init = async () => {
+      try {
+        const auth = await AsyncStorage.getItem("auth");
+        console.log("🧪 AUTH STORAGE =", auth);
+
+        await loadProfile();
+      } catch (e) {
+        console.log("❌ Init profile failed", e);
+      }
+    };
+
+    init();
   }, []);
 
   const loadProfile = async () => {
@@ -45,7 +57,11 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <Image
-            source={{ uri: "https://via.placeholder.com/80x80" }}
+            source={{
+              uri: user.imageUrl
+                ? `http://192.168.1.38:8080${user.imageUrl}`
+                : "https://via.placeholder.com/80",
+            }}
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
@@ -56,6 +72,12 @@ export default function ProfileScreen() {
 
         {/* Menu */}
         <View style={styles.menuSection}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/edit-profile")}
+          >
+            <Text style={styles.menuText}>Chỉnh sửa thông tin</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.menuItem, { backgroundColor: "#FEF2F2" }]}
             onPress={() => {

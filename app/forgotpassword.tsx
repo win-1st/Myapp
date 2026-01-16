@@ -63,12 +63,15 @@ export default function ForgotPassword() {
             setSuccess(true);
         } catch (err: any) {
             if (err.response?.data) {
-                setErrors({ email: "", general: err.response.data });
+                const message =
+                    typeof err.response.data === "string"
+                        ? err.response.data
+                        : err.response.data.message || "Có lỗi xảy ra";
+
+                setErrors({ email: "", general: message });
             } else {
                 setErrors({ email: "", general: "Không thể kết nối server" });
             }
-        } finally {
-            setLoading(false);
         }
     };
 

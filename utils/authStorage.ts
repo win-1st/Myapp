@@ -12,31 +12,19 @@ export interface AuthData {
 }
 
 // Lưu đăng nhập
-export const saveAuth = async (data: any): Promise<AuthData> => {
+export const saveAuth = async (authData: AuthData): Promise<AuthData> => {
   try {
-    const authData: AuthData = {
-      token: data.token || data.accessToken,
-      user: {
-        id: data.id,
-        username: data.username,
-        fullName: data.fullName,
-        email: data.email,
-        roles: data.roles,
-      },
-    };
-
-    // 🔥 Reset giỏ hàng khi user mới login
     await AsyncStorage.removeItem("currentOrderId");
-
     await AsyncStorage.setItem("auth", JSON.stringify(authData));
-    console.log("✅ Auth saved:", authData);
 
+    console.log("✅ Auth saved:", authData);
     return authData;
   } catch (error) {
     console.error("❌ Error saving auth:", error);
     throw error;
   }
 };
+
 
 
 // Lấy auth

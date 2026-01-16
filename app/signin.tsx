@@ -136,6 +136,7 @@ export default function SignIn() {
                     <Text style={styles.buttonText}>🔑 Đăng nhập</Text>
                 )}
             </TouchableOpacity>
+
             <TouchableOpacity
                 onPress={() => router.push('/forgotpassword')}
                 disabled={loading}
@@ -150,7 +151,6 @@ export default function SignIn() {
                     Quên mật khẩu?
                 </Text>
             </TouchableOpacity>
-
 
             <TouchableOpacity
                 onPress={() => router.push('/signup')}

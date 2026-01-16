@@ -11,8 +11,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { API_BASE } from "../../services/api";
 import { orderAPI } from '../../services/orderAPI';
-
 type Product = {
     id: number;
     name: string;
@@ -136,10 +136,13 @@ export default function OrderScreen() {
                 renderItem={({ item }) => (
                     <View style={styles.item}>
                         <Image
-                            source={{ uri: item.product.imageUrl }}
+                            source={{
+                                uri: item.product.imageUrl.startsWith("http")
+                                    ? item.product.imageUrl
+                                    : `${API_BASE}${item.product.imageUrl}`
+                            }}
                             style={{ width: 80, height: 80, borderRadius: 8 }}
                         />
-
                         <View style={{ flex: 1, marginLeft: 12 }}>
                             <Text style={styles.itemName}>{item.product.name}</Text>
                             <Text>Số lượng: {item.quantity}</Text>
