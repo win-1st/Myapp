@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useState } from "react";
 import {
@@ -6,6 +7,7 @@ import {
     Image,
     Modal,
     SafeAreaView,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -31,6 +33,7 @@ type OrderItem = {
 type Order = {
     id: number;
     totalAmount: number;
+    status?: string;
 };
 
 export default function OrderScreen() {
@@ -38,8 +41,7 @@ export default function OrderScreen() {
     const [items, setItems] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [paymentMethod, setPaymentMethod] =
-        useState<"CASH" | "MOMO" | "VNPAY">("CASH");
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOMO" | "VNPAY">("CASH");
 
     useEffect(() => {
         loadOrder();
@@ -101,151 +103,225 @@ export default function OrderScreen() {
         }
     };
 
+    const renderPaymentMethodIcon = (method: string) => {
+        switch (method) {
+            case "CASH":
+                return <Ionicons name="cash-outline" size={24} color="#4A6FFF" />;
+            case "MOMO":
+                return <Ionicons name="phone-portrait-outline" size={24} color="#D82D8B" />;
+            case "VNPAY":
+                return <Ionicons name="card-outline" size={24} color="#005BA4" />;
+            default:
+                return <Ionicons name="card-outline" size={24} color="#333" />;
+        }
+    };
+
+    const getPaymentMethodName = (method: string) => {
+        switch (method) {
+            case "CASH": return "Tiền mặt";
+            case "MOMO": return "Ví MoMo";
+            case "VNPAY": return "VNPay";
+            default: return method;
+        }
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={styles.center}>
-                <ActivityIndicator size="large" />
+                <ActivityIndicator size="large" color="#4A6FFF" />
             </SafeAreaView>
         );
     }
 
     if (!items.length) {
         return (
-            <SafeAreaView style={styles.center}>
-                <Text style={styles.empty}>🛒 Giỏ hàng trống</Text>
+            <SafeAreaView style={styles.container}>
+                <View style={styles.emptyContainer}>
+                    <Ionicons name="cart-outline" size={100} color="#E0E0E0" />
+                    <Text style={styles.emptyTitle}>Giỏ hàng trống</Text>
+                    <Text style={styles.emptySubtitle}>
+                        Hãy thêm sản phẩm vào giỏ hàng để tiếp tục mua sắm
+                    </Text>
+                </View>
             </SafeAreaView>
         );
     }
 
     return (
         <SafeAreaView style={styles.container}>
-            <Text style={styles.header}>🛒 Giỏ hàng</Text>
+            {/* Header */}
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Giỏ hàng của bạn</Text>
+                <Text style={styles.headerSubtitle}>{items.length} sản phẩm</Text>
+            </View>
 
+            {/* Cart Items */}
             <FlatList
                 data={items}
                 keyExtractor={(i) => i.id.toString()}
                 renderItem={({ item }) => (
-                    <View style={styles.item}>
+                    <View style={styles.card}>
                         <Image
                             source={{
                                 uri: item.product.imageUrl.startsWith("http")
                                     ? item.product.imageUrl
                                     : `${API_BASE}${item.product.imageUrl}`,
                             }}
-                            style={styles.image}
+                            style={styles.productImage}
                         />
 
-                        <View style={styles.info}>
-                            <Text style={styles.name}>{item.product.name}</Text>
-                            <Text style={styles.price}>
+                        <View style={styles.productInfo}>
+                            <Text style={styles.productName} numberOfLines={2}>
+                                {item.product.name}
+                            </Text>
+                            <Text style={styles.productPrice}>
                                 {item.product.price.toLocaleString()} đ
                             </Text>
 
-                            <View style={styles.qtyRow}>
+                            {/* Quantity Controls */}
+                            <View style={styles.quantityContainer}>
                                 <TouchableOpacity
                                     style={[
-                                        styles.qtyBtn,
-                                        item.quantity <= 1 && styles.qtyDisabled,
+                                        styles.quantityButton,
+                                        item.quantity <= 1 && styles.quantityButtonDisabled,
                                     ]}
                                     disabled={item.quantity <= 1}
-                                    onPress={() =>
-                                        changeQuantity(
-                                            item.product.id,
-                                            item.quantity - 1
-                                        )
-                                    }
+                                    onPress={() => changeQuantity(item.product.id, item.quantity - 1)}
                                 >
-                                    <Text style={styles.qtyText}>−</Text>
+                                    <Ionicons name="remove-outline" size={20} color={item.quantity <= 1 ? "#CCC" : "#333"} />
                                 </TouchableOpacity>
 
-                                <Text style={styles.qtyNum}>
-                                    {item.quantity}
-                                </Text>
+                                <Text style={styles.quantityText}>{item.quantity}</Text>
 
                                 <TouchableOpacity
-                                    style={styles.qtyBtn}
-                                    onPress={() =>
-                                        changeQuantity(
-                                            item.product.id,
-                                            item.quantity + 1
-                                        )
-                                    }
+                                    style={styles.quantityButton}
+                                    onPress={() => changeQuantity(item.product.id, item.quantity + 1)}
                                 >
-                                    <Text style={styles.qtyText}>＋</Text>
+                                    <Ionicons name="add-outline" size={20} color="#333" />
                                 </TouchableOpacity>
                             </View>
                         </View>
 
-                        <View style={styles.right}>
+                        <View style={styles.productActions}>
                             <Text style={styles.subtotal}>
                                 {item.subtotal.toLocaleString()} đ
                             </Text>
                             <TouchableOpacity
+                                style={styles.deleteButton}
                                 onPress={() => removeItem(item.product.id)}
                             >
-                                <Text style={styles.delete}>🗑️</Text>
+                                <Ionicons name="trash-outline" size={20} color="#FF4757" />
                             </TouchableOpacity>
                         </View>
                     </View>
                 )}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
             />
 
-            <View style={styles.totalBox}>
-                <Text style={styles.total}>
-                    Tổng cộng: {order?.totalAmount.toLocaleString()} đ
-                </Text>
+            {/* Order Summary */}
+            <View style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Tạm tính</Text>
+                    <Text style={styles.summaryValue}>
+                        {order?.totalAmount.toLocaleString()} đ
+                    </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+                    <Text style={styles.summaryValue}>0 đ</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.summaryRow}>
+                    <Text style={styles.totalLabel}>Tổng cộng</Text>
+                    <Text style={styles.totalValue}>
+                        {order?.totalAmount.toLocaleString()} đ
+                    </Text>
+                </View>
             </View>
 
+            {/* Checkout Button */}
             <TouchableOpacity
-                style={styles.payBtn}
+                style={styles.checkoutButton}
                 onPress={() => setShowPaymentModal(true)}
             >
-                <Text style={styles.payText}>Thanh toán</Text>
+                <Ionicons name="card-outline" size={22} color="#FFF" />
+                <Text style={styles.checkoutText}>Thanh toán</Text>
             </TouchableOpacity>
 
-            {/* PAYMENT MODAL */}
-            <Modal visible={showPaymentModal} transparent animationType="slide">
+            {/* Payment Modal */}
+            <Modal
+                visible={showPaymentModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowPaymentModal(false)}
+            >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalBox}>
-                        <Text style={styles.modalTitle}>
-                            💳 Phương thức thanh toán
-                        </Text>
-
-                        {["CASH", "MOMO", "VNPAY"].map((m) => (
-                            <TouchableOpacity
-                                key={m}
-                                style={[
-                                    styles.methodBtn,
-                                    paymentMethod === m &&
-                                    styles.methodActive,
-                                ]}
-                                onPress={() => setPaymentMethod(m as any)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.methodText,
-                                        paymentMethod === m && { color: "#fff" },
-                                    ]}
-                                >
-                                    {m}
-                                </Text>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chọn phương thức thanh toán</Text>
+                            <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                                <Ionicons name="close" size={24} color="#666" />
                             </TouchableOpacity>
-                        ))}
+                        </View>
 
-                        <TouchableOpacity
-                            style={styles.confirmBtn}
-                            onPress={handleCheckout}
-                        >
-                            <Text style={styles.confirmText}>
-                                Xác nhận thanh toán
-                            </Text>
-                        </TouchableOpacity>
+                        <ScrollView style={styles.paymentMethods}>
+                            {["CASH", "MOMO", "VNPAY"].map((method) => (
+                                <TouchableOpacity
+                                    key={method}
+                                    style={[
+                                        styles.paymentMethod,
+                                        paymentMethod === method && styles.paymentMethodActive,
+                                    ]}
+                                    onPress={() => setPaymentMethod(method as any)}
+                                >
+                                    <View style={styles.methodInfo}>
+                                        {renderPaymentMethodIcon(method)}
+                                        <View style={styles.methodTextContainer}>
+                                            <Text style={[
+                                                styles.methodName,
+                                                paymentMethod === method && styles.methodNameActive
+                                            ]}>
+                                                {getPaymentMethodName(method)}
+                                            </Text>
+                                            <Text style={styles.methodDescription}>
+                                                {method === "CASH" ? "Thanh toán khi nhận hàng" :
+                                                    method === "MOMO" ? "Thanh toán qua ví MoMo" :
+                                                        "Thanh toán qua VNPay"}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {paymentMethod === method && (
+                                        <Ionicons name="checkmark-circle" size={24} color="#4A6FFF" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
 
-                        <TouchableOpacity
-                            onPress={() => setShowPaymentModal(false)}
-                        >
-                            <Text style={styles.cancel}>Hủy</Text>
-                        </TouchableOpacity>
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity
+                                style={styles.confirmButton}
+                                onPress={handleCheckout}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="checkmark-circle-outline" size={22} color="#FFF" />
+                                        <Text style={styles.confirmButtonText}>
+                                            Xác nhận thanh toán
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => setShowPaymentModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Hủy</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -254,90 +330,285 @@ export default function OrderScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 16, backgroundColor: "#f6f6f6" },
-    center: { flex: 1, justifyContent: "center", alignItems: "center" },
-    header: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
-    empty: { fontSize: 18, color: "#888" },
-
-    item: {
-        flexDirection: "row",
-        backgroundColor: "#fff",
-        padding: 14,
-        borderRadius: 12,
-        marginBottom: 12,
-        elevation: 2,
-    },
-
-    image: { width: 90, height: 90, borderRadius: 10 },
-    info: { flex: 1, marginLeft: 12, justifyContent: "space-between" },
-    name: { fontSize: 16, fontWeight: "600" },
-    price: { color: "#E53935", fontWeight: "bold" },
-
-    qtyRow: { flexDirection: "row", alignItems: "center" },
-    qtyBtn: {
-        width: 32,
-        height: 32,
-        borderWidth: 1,
-        borderRadius: 6,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    qtyDisabled: { opacity: 0.4 },
-    qtyText: { fontSize: 18, fontWeight: "bold" },
-    qtyNum: { marginHorizontal: 12, fontSize: 16, fontWeight: "bold" },
-
-    right: { alignItems: "flex-end", justifyContent: "space-between" },
-    subtotal: { fontWeight: "bold" },
-    delete: { fontSize: 20, color: "red" },
-
-    totalBox: {
-        padding: 16,
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        marginTop: 8,
-    },
-    total: { fontSize: 18, fontWeight: "bold", textAlign: "right" },
-
-    payBtn: {
-        backgroundColor: "#E53935",
-        padding: 16,
-        borderRadius: 12,
-        marginTop: 12,
-    },
-    payText: { color: "#fff", textAlign: "center", fontSize: 18 },
-
-    modalOverlay: {
+    container: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
+        backgroundColor: "#FFFFFF",
+    },
+    center: {
+        flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: "#FFFFFF",
     },
-    modalBox: {
-        width: "85%",
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 20,
+    emptyContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 40,
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        marginBottom: 12,
-        textAlign: "center",
-    },
-    methodBtn: {
-        padding: 14,
-        borderRadius: 10,
-        borderWidth: 1,
+    emptyTitle: {
+        fontSize: 24,
+        fontWeight: "600",
+        color: "#333",
+        marginTop: 20,
         marginBottom: 8,
     },
-    methodActive: { backgroundColor: "#E53935", borderColor: "#E53935" },
-    methodText: { textAlign: "center", fontSize: 16 },
-    confirmBtn: {
-        backgroundColor: "#E53935",
-        padding: 14,
-        borderRadius: 12,
-        marginTop: 10,
+    emptySubtitle: {
+        fontSize: 16,
+        color: "#666",
+        textAlign: "center",
+        lineHeight: 22,
     },
-    confirmText: { color: "#fff", textAlign: "center" },
-    cancel: { textAlign: "center", marginTop: 10, color: "#888" },
+    header: {
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#F0F0F0",
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontWeight: "700",
+        color: "#1A1A1A",
+    },
+    headerSubtitle: {
+        fontSize: 16,
+        color: "#666",
+        marginTop: 4,
+    },
+    listContainer: {
+        padding: 20,
+    },
+    card: {
+        flexDirection: "row",
+        backgroundColor: "#FFF",
+        borderRadius: 16,
+        marginBottom: 16,
+        padding: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: "#F5F5F5",
+    },
+    productImage: {
+        width: 100,
+        height: 100,
+        borderRadius: 12,
+        backgroundColor: "#F8F8F8",
+    },
+    productInfo: {
+        flex: 1,
+        marginLeft: 16,
+        justifyContent: "space-between",
+    },
+    productName: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#1A1A1A",
+        lineHeight: 22,
+    },
+    productPrice: {
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#E53935",
+        marginTop: 4,
+    },
+    quantityContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 12,
+        backgroundColor: "#F8F9FA",
+        borderRadius: 8,
+        alignSelf: "flex-start",
+        padding: 4,
+    },
+    quantityButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        backgroundColor: "#FFF",
+        justifyContent: "center",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#E8E8E8",
+    },
+    quantityButtonDisabled: {
+        backgroundColor: "#F5F5F5",
+        borderColor: "#EEE",
+    },
+    quantityText: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#333",
+        marginHorizontal: 16,
+        minWidth: 24,
+        textAlign: "center",
+    },
+    productActions: {
+        justifyContent: "space-between",
+        alignItems: "flex-end",
+    },
+    subtotal: {
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#1A1A1A",
+    },
+    deleteButton: {
+        padding: 8,
+    },
+    summaryCard: {
+        marginHorizontal: 20,
+        marginBottom: 20,
+        backgroundColor: "#F8F9FF",
+        borderRadius: 16,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: "#E8F0FF",
+    },
+    summaryRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 12,
+    },
+    summaryLabel: {
+        fontSize: 16,
+        color: "#666",
+    },
+    summaryValue: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#333",
+    },
+    divider: {
+        height: 1,
+        backgroundColor: "#E8E8E8",
+        marginVertical: 12,
+    },
+    totalLabel: {
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#1A1A1A",
+    },
+    totalValue: {
+        fontSize: 24,
+        fontWeight: "700",
+        color: "#E53935",
+    },
+    checkoutButton: {
+        marginHorizontal: 20,
+        marginBottom: 30,
+        backgroundColor: "#4A6FFF",
+        borderRadius: 14,
+        paddingVertical: 18,
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        shadowColor: "#4A6FFF",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    checkoutText: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#FFF",
+        marginLeft: 8,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "flex-end",
+    },
+    modalContainer: {
+        backgroundColor: "#FFFFFF",
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: "80%",
+    },
+    modalHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: "#F0F0F0",
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "700",
+        color: "#1A1A1A",
+    },
+    paymentMethods: {
+        padding: 20,
+    },
+    paymentMethod: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#E8E8E8",
+        marginBottom: 12,
+    },
+    paymentMethodActive: {
+        borderColor: "#4A6FFF",
+        backgroundColor: "#F8FAFF",
+    },
+    methodInfo: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    methodTextContainer: {
+        marginLeft: 12,
+    },
+    methodName: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#333",
+        marginBottom: 2,
+    },
+    methodNameActive: {
+        color: "#4A6FFF",
+    },
+    methodDescription: {
+        fontSize: 14,
+        color: "#666",
+    },
+    modalFooter: {
+        padding: 20,
+        borderTopWidth: 1,
+        borderTopColor: "#F0F0F0",
+    },
+    confirmButton: {
+        backgroundColor: "#4A6FFF",
+        borderRadius: 12,
+        paddingVertical: 16,
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    confirmButtonText: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#FFF",
+        marginLeft: 8,
+    },
+    cancelButton: {
+        paddingVertical: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#E8E8E8",
+        alignItems: "center",
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        color: "#666",
+        fontWeight: "500",
+    },
 });

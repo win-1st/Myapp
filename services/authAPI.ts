@@ -13,5 +13,14 @@ export const authAPI = {
         newPassword: string;
     }) =>
         api.post("/api/auth/reset-password-otp", data),
+
+    uploadImage: (formData: FormData) =>
+        api.post("/api/auth/upload-avatar", formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        }),
 };
+
+
 

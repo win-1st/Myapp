@@ -193,7 +193,7 @@ export default function WelcomeScreen() {
                             ]}
                         />
                     </View>
-                    <Text style={styles.skipText}>Skip {timeLeft}s</Text>
+                    <Text style={styles.skipText}>Bỏ qua {timeLeft}s</Text>
                 </View>
             </TouchableOpacity>
 
@@ -218,13 +218,13 @@ export default function WelcomeScreen() {
 
                     {/* Title Section */}
                     <View style={styles.textContainer}>
-                        <Text style={styles.title}>Welcome to Foodie</Text>
+                        <Text style={styles.title}>Chào mừng đến Foodie</Text>
                         <Text style={styles.subtitle}>
-                            Find the best food and drinks around you
+                            Tìm món ăn và thức uống ngon nhất quanh bạn
                         </Text>
                         <Text style={styles.description}>
-                            Discover amazing restaurants, order your favorite meals,
-                            and enjoy delicious food delivered to your doorstep
+                            Khám phá nhà hàng tuyệt vời, đặt món ăn yêu thích,
+                            và thưởng thức món ngon được giao tận cửa
                         </Text>
                     </View>
 
@@ -233,9 +233,9 @@ export default function WelcomeScreen() {
                         <View style={styles.featureItem}>
                             <Ionicons name="restaurant" size={24} color="#FF6B35" />
                             <View style={styles.featureTextContainer}>
-                                <Text style={styles.featureTitle}>Best Restaurants</Text>
+                                <Text style={styles.featureTitle}>Nhà hàng tốt nhất</Text>
                                 <Text style={styles.featureDescription}>
-                                    Find top-rated restaurants near you
+                                    Tìm nhà hàng được đánh giá cao gần bạn
                                 </Text>
                             </View>
                         </View>
@@ -243,9 +243,9 @@ export default function WelcomeScreen() {
                         <View style={styles.featureItem}>
                             <Ionicons name="bicycle" size={24} color="#FF6B35" />
                             <View style={styles.featureTextContainer}>
-                                <Text style={styles.featureTitle}>Fast Delivery</Text>
+                                <Text style={styles.featureTitle}>Giao hàng nhanh</Text>
                                 <Text style={styles.featureDescription}>
-                                    Get your food delivered in minutes
+                                    Nhận món ăn của bạn trong vài phút
                                 </Text>
                             </View>
                         </View>
@@ -253,9 +253,9 @@ export default function WelcomeScreen() {
                         <View style={styles.featureItem}>
                             <Ionicons name="card" size={24} color="#FF6B35" />
                             <View style={styles.featureTextContainer}>
-                                <Text style={styles.featureTitle}>Easy Payment</Text>
+                                <Text style={styles.featureTitle}>Thanh toán dễ dàng</Text>
                                 <Text style={styles.featureDescription}>
-                                    Secure and convenient payment options
+                                    Tùy chọn thanh toán an toàn và tiện lợi
                                 </Text>
                             </View>
                         </View>
@@ -264,7 +264,7 @@ export default function WelcomeScreen() {
                     {/* Countdown Message */}
                     <View style={styles.countdownContainer}>
                         <Text style={styles.countdownText}>
-                            Redirecting to sign in page in {timeLeft} seconds...
+                            Chuyển đến trang đăng nhập sau {timeLeft} giây...
                         </Text>
                     </View>
                 </Animated.View>
