@@ -8,7 +8,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { authAPI } from "../services/authAPI";
+import { authAPI } from "../services/authAPI"; 
 
 export default function ForgotPasswordOtp() {
     const [step, setStep] = useState<1 | 2>(1);
