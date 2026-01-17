@@ -138,7 +138,7 @@ export default function SignIn() {
             </TouchableOpacity>
 
             <TouchableOpacity
-                onPress={() => router.push('/forgotpassword')}
+                onPress={() => router.push('/ForgotPasswordOtp')}
                 disabled={loading}
                 style={{ marginTop: 12, alignItems: 'center' }}
             >
