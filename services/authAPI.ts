@@ -5,7 +5,9 @@ export const authAPI = {
     updateMe: (data: any) => api.put("/api/auth/me", data),
     updateQuantity(orderId: number, productId: number, quantity: number) {
         return api.put(
-            `/api/customer/orders/${orderId}/items/${productId}?quantity=${quantity}`
+            `/customer/orders/${orderId}/items/${productId}`,
+            null,
+            { params: { quantity } }
         );
     }
 };

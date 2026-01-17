@@ -34,4 +34,13 @@ export const orderAPI = {
         return api.get("/api/customer/orders");
     },
 
+    updateQuantity(orderId, productId, quantity) {
+        return api.put(
+            `/api/customer/orders/${orderId}/items/${productId}`,
+            null,
+            {
+                params: { quantity },
+            }
+        );
+    },
 };

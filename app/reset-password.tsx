@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -13,8 +14,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import api from "../services/api";
-
+import { API_BASE } from "../services/api";
 export default function ResetPassword() {
     const { token } = useLocalSearchParams<{ token?: string }>();
     const [password, setPassword] = useState("");
@@ -47,7 +47,7 @@ export default function ResetPassword() {
 
         setLoading(true);
         try {
-            await api.post("/api/auth/reset-password", {
+            await axios.post(`${API_BASE}/api/auth/reset-password`, {
                 token,
                 newPassword: password,
             });

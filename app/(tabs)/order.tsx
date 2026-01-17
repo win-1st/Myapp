@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -10,20 +10,22 @@ import {
     Text,
     TouchableOpacity,
     View
-} from 'react-native';
+} from "react-native";
 import { API_BASE } from "../../services/api";
-import { orderAPI } from '../../services/orderAPI';
+import { orderAPI } from "../../services/orderAPI";
+
 type Product = {
     id: number;
     name: string;
     imageUrl: string;
     price: number;
 };
+
 type OrderItem = {
     id: number;
     quantity: number;
     subtotal: number;
-    product: Product;   // 🔥
+    product: Product;
 };
 
 type Order = {
@@ -36,7 +38,8 @@ export default function OrderScreen() {
     const [items, setItems] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOMO" | "PAYOS">("CASH");
+    const [paymentMethod, setPaymentMethod] =
+        useState<"CASH" | "MOMO" | "VNPAY">("CASH");
 
     useEffect(() => {
         loadOrder();
@@ -45,25 +48,54 @@ export default function OrderScreen() {
     const loadOrder = async () => {
         try {
             const orderIdStr = await AsyncStorage.getItem("currentOrderId");
-
             if (!orderIdStr) {
-                console.log("❌ No currentOrderId in storage");
                 setLoading(false);
                 return;
             }
 
-            const orderId = parseInt(orderIdStr);
-            console.log("📦 Loading order:", orderId);
-
-            const res = await orderAPI.getOrder(orderId);
-
-            console.log("🧾 ORDER API RESPONSE:", JSON.stringify(res.data, null, 2));
-
+            const res = await orderAPI.getOrder(Number(orderIdStr));
             setOrder(res.data.order);
             setItems(res.data.items);
-
         } catch (e) {
             console.log("❌ Load order error", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const changeQuantity = async (productId: number, newQty: number) => {
+        if (!order || newQty < 1) return;
+        try {
+            await orderAPI.updateQuantity(order.id, productId, newQty);
+            loadOrder();
+        } catch (e) {
+            alert("❌ Không thể cập nhật số lượng");
+        }
+    };
+
+    const removeItem = async (productId: number) => {
+        if (!order) return;
+        try {
+            await orderAPI.removeItem(order.id, productId);
+            loadOrder();
+        } catch (e) {
+            alert("❌ Không thể xóa sản phẩm");
+        }
+    };
+
+    const handleCheckout = async () => {
+        if (!order) return;
+        try {
+            setLoading(true);
+            await orderAPI.confirm(order.id);
+            await orderAPI.pay(order.id, paymentMethod);
+            alert("✅ Thanh toán thành công");
+            await AsyncStorage.removeItem("currentOrderId");
+            setOrder(null);
+            setItems([]);
+            setShowPaymentModal(false);
+        } catch (e) {
+            alert("❌ Thanh toán thất bại");
         } finally {
             setLoading(false);
         }
@@ -79,52 +111,11 @@ export default function OrderScreen() {
 
     if (!items.length) {
         return (
-            <SafeAreaView style={styles.container}>
-                <Text style={styles.emptyText}>🛒 Giỏ hàng trống</Text>
+            <SafeAreaView style={styles.center}>
+                <Text style={styles.empty}>🛒 Giỏ hàng trống</Text>
             </SafeAreaView>
         );
     }
-
-    const handleCheckout = async (method: "CASH" | "MOMO" | "PAYOS") => {
-        if (!order) {
-            alert("❌ Không tìm thấy đơn hàng");
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            await orderAPI.confirm(order.id);
-
-            const res = await orderAPI.pay(order.id, method); // 🔥 dùng method
-            console.log("💰 Payment result:", res.data);
-
-            alert("✅ Thanh toán thành công!");
-
-            await AsyncStorage.removeItem("currentOrderId");
-            setItems([]);
-            setOrder(null);
-            setShowPaymentModal(false);
-
-        } catch (err) {
-            console.log("❌ Payment error", err);
-            alert("❌ Thanh toán thất bại");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const removeItem = async (productId: number) => {
-        if (!order) return;
-
-        try {
-            await orderAPI.removeItem(order.id, productId);
-            loadOrder(); // reload giỏ hàng sau khi xóa
-        } catch (err) {
-            console.log("❌ Remove item error", err);
-            alert("❌ Không thể xóa sản phẩm");
-        }
-    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -132,235 +123,221 @@ export default function OrderScreen() {
 
             <FlatList
                 data={items}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(i) => i.id.toString()}
                 renderItem={({ item }) => (
                     <View style={styles.item}>
                         <Image
                             source={{
                                 uri: item.product.imageUrl.startsWith("http")
                                     ? item.product.imageUrl
-                                    : `${API_BASE}${item.product.imageUrl}`
+                                    : `${API_BASE}${item.product.imageUrl}`,
                             }}
-                            style={{ width: 80, height: 80, borderRadius: 8 }}
+                            style={styles.image}
                         />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={styles.itemName}>{item.product.name}</Text>
-                            <Text>Số lượng: {item.quantity}</Text>
-                            <Text>{item.subtotal.toLocaleString()} đ</Text>
+
+                        <View style={styles.info}>
+                            <Text style={styles.name}>{item.product.name}</Text>
+                            <Text style={styles.price}>
+                                {item.product.price.toLocaleString()} đ
+                            </Text>
+
+                            <View style={styles.qtyRow}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.qtyBtn,
+                                        item.quantity <= 1 && styles.qtyDisabled,
+                                    ]}
+                                    disabled={item.quantity <= 1}
+                                    onPress={() =>
+                                        changeQuantity(
+                                            item.product.id,
+                                            item.quantity - 1
+                                        )
+                                    }
+                                >
+                                    <Text style={styles.qtyText}>−</Text>
+                                </TouchableOpacity>
+
+                                <Text style={styles.qtyNum}>
+                                    {item.quantity}
+                                </Text>
+
+                                <TouchableOpacity
+                                    style={styles.qtyBtn}
+                                    onPress={() =>
+                                        changeQuantity(
+                                            item.product.id,
+                                            item.quantity + 1
+                                        )
+                                    }
+                                >
+                                    <Text style={styles.qtyText}>＋</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        {/* 🗑️ Nút xóa */}
-                        <TouchableOpacity
-                            onPress={() => removeItem(item.product.id)}
-                            style={{ padding: 10 }}
-                        >
-                            <Text style={{ fontSize: 20, color: "red" }}>🗑️</Text>
-                        </TouchableOpacity>
+                        <View style={styles.right}>
+                            <Text style={styles.subtotal}>
+                                {item.subtotal.toLocaleString()} đ
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => removeItem(item.product.id)}
+                            >
+                                <Text style={styles.delete}>🗑️</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
             />
 
-            <TouchableOpacity style={styles.payBtn} onPress={() => setShowPaymentModal(true)}>
-                <Text style={styles.payText}>Thanh toán</Text>
-            </TouchableOpacity>
-
-
-
             <View style={styles.totalBox}>
-                <Text style={styles.totalText}>
-                    Tổng cộng: {order?.totalAmount?.toLocaleString() ?? "0"} đ
+                <Text style={styles.total}>
+                    Tổng cộng: {order?.totalAmount.toLocaleString()} đ
                 </Text>
             </View>
 
+            <TouchableOpacity
+                style={styles.payBtn}
+                onPress={() => setShowPaymentModal(true)}
+            >
+                <Text style={styles.payText}>Thanh toán</Text>
+            </TouchableOpacity>
+
+            {/* PAYMENT MODAL */}
             <Modal visible={showPaymentModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalBox}>
-                        <Text style={styles.modalTitle}>💳 Chọn phương thức thanh toán</Text>
+                        <Text style={styles.modalTitle}>
+                            💳 Phương thức thanh toán
+                        </Text>
 
                         {["CASH", "MOMO", "VNPAY"].map((m) => (
                             <TouchableOpacity
                                 key={m}
                                 style={[
                                     styles.methodBtn,
-                                    paymentMethod === m && styles.methodActive
+                                    paymentMethod === m &&
+                                    styles.methodActive,
                                 ]}
                                 onPress={() => setPaymentMethod(m as any)}
                             >
                                 <Text
                                     style={[
                                         styles.methodText,
-                                        paymentMethod === m && { color: "#fff" }
+                                        paymentMethod === m && { color: "#fff" },
                                     ]}
                                 >
-                                    {m === "CASH" && "💵 Tiền mặt"}
-                                    {m === "MOMO" && "📱 Momo"}
-                                    {m === "VNPAY" && "🏦 VNPay"}
+                                    {m}
                                 </Text>
                             </TouchableOpacity>
                         ))}
 
                         <TouchableOpacity
                             style={styles.confirmBtn}
-                            onPress={() => handleCheckout(paymentMethod)}
+                            onPress={handleCheckout}
                         >
-                            <Text style={styles.confirmText}>Xác nhận thanh toán</Text>
+                            <Text style={styles.confirmText}>
+                                Xác nhận thanh toán
+                            </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
-                            <Text style={styles.cancelText}>Hủy</Text>
+                        <TouchableOpacity
+                            onPress={() => setShowPaymentModal(false)}
+                        >
+                            <Text style={styles.cancel}>Hủy</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
-
         </SafeAreaView>
-
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#f9f9f9",
-        padding: 16
-    },
-
-    center: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center"
-    },
-
-    header: {
-        fontSize: 24,
-        fontWeight: "bold",
-        marginBottom: 16,
-        color: "#333"
-    },
-
-    emptyText: {
-        textAlign: "center",
-        marginTop: 50,
-        fontSize: 18,
-        color: "#888"
-    },
+    container: { flex: 1, padding: 16, backgroundColor: "#f6f6f6" },
+    center: { flex: 1, justifyContent: "center", alignItems: "center" },
+    header: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
+    empty: { fontSize: 18, color: "#888" },
 
     item: {
+        flexDirection: "row",
         backgroundColor: "#fff",
         padding: 14,
-        borderRadius: 10,
+        borderRadius: 12,
         marginBottom: 12,
-        shadowColor: "#000",
-        shadowOpacity: 0.05,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 2
+        elevation: 2,
     },
 
-    itemName: {
-        fontSize: 16,
-        fontWeight: "600",
-        marginBottom: 4
-    },
+    image: { width: 90, height: 90, borderRadius: 10 },
+    info: { flex: 1, marginLeft: 12, justifyContent: "space-between" },
+    name: { fontSize: 16, fontWeight: "600" },
+    price: { color: "#E53935", fontWeight: "bold" },
 
-    itemQuantity: {
-        fontSize: 14,
-        color: "#555"
+    qtyRow: { flexDirection: "row", alignItems: "center" },
+    qtyBtn: {
+        width: 32,
+        height: 32,
+        borderWidth: 1,
+        borderRadius: 6,
+        justifyContent: "center",
+        alignItems: "center",
     },
+    qtyDisabled: { opacity: 0.4 },
+    qtyText: { fontSize: 18, fontWeight: "bold" },
+    qtyNum: { marginHorizontal: 12, fontSize: 16, fontWeight: "bold" },
 
-    itemPrice: {
-        fontSize: 15,
-        fontWeight: "bold",
-        marginTop: 6,
-        color: "#E53935"
-    },
+    right: { alignItems: "flex-end", justifyContent: "space-between" },
+    subtotal: { fontWeight: "bold" },
+    delete: { fontSize: 20, color: "red" },
 
     totalBox: {
-        marginTop: 16,
         padding: 16,
         backgroundColor: "#fff",
         borderRadius: 12,
-        borderTopWidth: 1,
-        borderColor: "#eee"
+        marginTop: 8,
     },
-
-    totalText: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#000",
-        textAlign: "right"
-    },
+    total: { fontSize: 18, fontWeight: "bold", textAlign: "right" },
 
     payBtn: {
         backgroundColor: "#E53935",
         padding: 16,
         borderRadius: 12,
-        marginTop: 12
+        marginTop: 12,
     },
-    payText: {
-        color: "#fff",
-        textAlign: "center",
-        fontSize: 18,
-        fontWeight: "bold"
-    },
+    payText: { color: "#fff", textAlign: "center", fontSize: 18 },
 
     modalOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.5)",
         justifyContent: "center",
-        alignItems: "center"
+        alignItems: "center",
     },
-
     modalBox: {
         width: "85%",
         backgroundColor: "#fff",
         borderRadius: 16,
-        padding: 20
+        padding: 20,
     },
-
     modalTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: "bold",
-        marginBottom: 16,
-        textAlign: "center"
+        marginBottom: 12,
+        textAlign: "center",
     },
-
     methodBtn: {
         padding: 14,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: "#ddd",
-        marginBottom: 10
+        marginBottom: 8,
     },
-
-    methodActive: {
-        backgroundColor: "#E53935",
-        borderColor: "#E53935"
-    },
-
-    methodText: {
-        fontSize: 16,
-        textAlign: "center"
-    },
-
+    methodActive: { backgroundColor: "#E53935", borderColor: "#E53935" },
+    methodText: { textAlign: "center", fontSize: 16 },
     confirmBtn: {
         backgroundColor: "#E53935",
         padding: 14,
         borderRadius: 12,
-        marginTop: 10
+        marginTop: 10,
     },
-
-    confirmText: {
-        color: "#fff",
-        textAlign: "center",
-        fontSize: 16,
-        fontWeight: "bold"
-    },
-
-    cancelText: {
-        textAlign: "center",
-        marginTop: 12,
-        color: "#888"
-    }
+    confirmText: { color: "#fff", textAlign: "center" },
+    cancel: { textAlign: "center", marginTop: 10, color: "#888" },
 });
-
-

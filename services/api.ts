@@ -51,4 +51,8 @@ api.interceptors.request.use(async (config) => {
     return config;
 });
 
+await axios.post(`${API_BASE}/api/auth/reset-password`, {
+    token,
+    newPassword: password,
+});
 export default api;
