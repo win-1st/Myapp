@@ -5,6 +5,7 @@ import {
     ActivityIndicator,
     FlatList,
     Image,
+    Linking,
     Modal,
     SafeAreaView,
     ScrollView,
@@ -41,7 +42,7 @@ export default function OrderScreen() {
     const [items, setItems] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOMO" | "VNPAY">("CASH");
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOMO" | "PAYOS">("CASH");
 
     useEffect(() => {
         loadOrder();
@@ -87,15 +88,29 @@ export default function OrderScreen() {
 
     const handleCheckout = async () => {
         if (!order) return;
+
         try {
             setLoading(true);
+
             await orderAPI.confirm(order.id);
+
+            if (paymentMethod === "PAYOS") {
+                const res = await orderAPI.pay(order.id, "PAYOS");
+
+                const checkoutUrl = res.data.checkoutUrl;
+                await Linking.openURL(checkoutUrl);
+                return;
+            }
+
+            // CASH / MOMO
             await orderAPI.pay(order.id, paymentMethod);
             alert("✅ Thanh toán thành công");
+
             await AsyncStorage.removeItem("currentOrderId");
             setOrder(null);
             setItems([]);
             setShowPaymentModal(false);
+
         } catch (e) {
             alert("❌ Thanh toán thất bại");
         } finally {
@@ -109,7 +124,7 @@ export default function OrderScreen() {
                 return <Ionicons name="cash-outline" size={24} color="#4A6FFF" />;
             case "MOMO":
                 return <Ionicons name="phone-portrait-outline" size={24} color="#D82D8B" />;
-            case "VNPAY":
+            case "PAYOS":
                 return <Ionicons name="card-outline" size={24} color="#005BA4" />;
             default:
                 return <Ionicons name="card-outline" size={24} color="#333" />;
@@ -120,7 +135,7 @@ export default function OrderScreen() {
         switch (method) {
             case "CASH": return "Tiền mặt";
             case "MOMO": return "Ví MoMo";
-            case "VNPAY": return "VNPay";
+            case "PAYOS": return "PAYOS";
             default: return method;
         }
     };
@@ -266,7 +281,7 @@ export default function OrderScreen() {
                         </View>
 
                         <ScrollView style={styles.paymentMethods}>
-                            {["CASH", "MOMO", "VNPAY"].map((method) => (
+                            {["CASH", "MOMO", "PAYOS"].map((method) => (
                                 <TouchableOpacity
                                     key={method}
                                     style={[
@@ -287,7 +302,7 @@ export default function OrderScreen() {
                                             <Text style={styles.methodDescription}>
                                                 {method === "CASH" ? "Thanh toán khi nhận hàng" :
                                                     method === "MOMO" ? "Thanh toán qua ví MoMo" :
-                                                        "Thanh toán qua VNPay"}
+                                                        "Thanh toán qua PAYOS"}
                                             </Text>
                                         </View>
                                     </View>
