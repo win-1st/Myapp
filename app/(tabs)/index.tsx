@@ -8,6 +8,7 @@ import {
   FlatList,
   Image,
   ListRenderItem,
+  Modal,
   Platform,
   RefreshControl,
   SafeAreaView,
@@ -16,11 +17,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import api, { API_BASE } from "../../services/api";
 
-const { width: screenWidth } = Dimensions.get('window');   // chỉnh path cho đúng
+const { width: screenWidth } = Dimensions.get('window');
 
 // Type definitions
 interface Restaurant {
@@ -49,6 +50,10 @@ interface Category {
   name: string;
 }
 
+interface PriceRange {
+  min: number;
+  max: number;
+}
 
 // Props interface cho RestaurantCard
 interface RestaurantCardProps {
@@ -82,8 +87,14 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
   const flatListRef = useRef<FlatList<Restaurant>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  // State cho bộ lọc giá
+  const [priceRange, setPriceRange] = useState<PriceRange>({ min: 0, max: 1000000 });
+  const [tempPriceRange, setTempPriceRange] = useState<PriceRange>({ min: 0, max: 1000000 });
+  const [isFilterActive, setIsFilterActive] = useState<boolean>(false);
 
   // Dữ liệu mẫu cho restaurants
   const popularRestaurants: Restaurant[] = [
@@ -121,32 +132,25 @@ export default function HomeScreen() {
 
   const fetchCategories = async () => {
     try {
-      const res = await api.get("/api/customer/categories"); // 🔥 có token
-
+      const res = await api.get("/api/customer/categories");
       const all = { id: "all", name: "Tất cả" };
-
       const normalized = res.data.map((c: any) => ({
         id: c.id.toString(),
         name: c.name,
       }));
-
       setCategories([all, ...normalized]);
     } catch (err) {
       console.log("❌ Category load error:", err);
     }
   };
 
-  // Trong HomeScreen.tsx - CHỈ SỬA PHẦN fetchProducts
-  // HomeScreen.tsx - Sử dụng fetch thay vì axios
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setLoadingError(null);
-
       console.log("🔌 Fetching products...");
 
-      const res = await api.get("/api/customer/products"); // 🔥 có token
-
+      const res = await api.get("/api/customer/products");
       const data = res.data;
 
       const transformedItems: FoodItem[] = data.map((product: any) => ({
@@ -165,7 +169,16 @@ export default function HomeScreen() {
       }));
 
       setFoodItems(transformedItems);
-      setFilteredFoodItems(transformedItems);
+
+      // Tự động tính toán khoảng giá từ dữ liệu
+      const prices = transformedItems.map(item => item.price);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      setPriceRange({ min: minPrice, max: maxPrice });
+      setTempPriceRange({ min: minPrice, max: maxPrice });
+
+      // Áp dụng filter ngay sau khi load dữ liệu
+      applyFilters(transformedItems, "", "all", { min: minPrice, max: maxPrice });
     } catch (err: any) {
       console.error("❌ Product load failed:", err?.response?.status, err?.message);
       setLoadingError("Không thể tải danh sách sản phẩm");
@@ -174,7 +187,6 @@ export default function HomeScreen() {
       setRefreshing(false);
     }
   };
-
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -200,25 +212,82 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    let data = foodItems;
+  // Hàm áp dụng tất cả bộ lọc
+  const applyFilters = (
+    data: FoodItem[],
+    query: string,
+    category: string,
+    price: PriceRange
+  ) => {
+    let filtered = [...data];
 
     // Filter by category
-    if (activeCategory !== "all") {
-      data = data.filter(item => item.categoryId === activeCategory);
+    if (category !== "all") {
+      filtered = filtered.filter(item => item.categoryId === category);
     }
 
     // Filter by search
-    if (searchQuery.trim() !== "") {
-      data = data.filter(item =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchQuery.toLowerCase())
+    if (query.trim() !== "") {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(query.toLowerCase()) ||
+        item.category.toLowerCase().includes(query.toLowerCase())
       );
     }
 
-    setFilteredFoodItems(data);
-  }, [searchQuery, foodItems, activeCategory]);
+    // Filter by price range
+    filtered = filtered.filter(item =>
+      item.price >= price.min && item.price <= price.max
+    );
 
+    // Kiểm tra xem có filter đang active không
+    const hasActiveFilters = category !== "all" || query.trim() !== "" ||
+      (price.min !== tempPriceRange.min || price.max !== tempPriceRange.max);
+    setIsFilterActive(hasActiveFilters);
+
+    setFilteredFoodItems(filtered);
+  };
+
+  // Effect để áp dụng filters khi có thay đổi
+  useEffect(() => {
+    applyFilters(foodItems, searchQuery, activeCategory, priceRange);
+  }, [searchQuery, foodItems, activeCategory, priceRange]);
+
+  // Mở modal filter
+  const openFilterModal = () => {
+    setTempPriceRange(priceRange);
+    setShowFilterModal(true);
+  };
+
+  // Áp dụng filter từ modal
+  const applyFilterFromModal = () => {
+    setPriceRange(tempPriceRange);
+    setShowFilterModal(false);
+  };
+
+  // Reset filter
+  const resetFilter = () => {
+    const minPrice = Math.min(...foodItems.map(item => item.price));
+    const maxPrice = Math.max(...foodItems.map(item => item.price));
+    setPriceRange({ min: minPrice, max: maxPrice });
+    setTempPriceRange({ min: minPrice, max: maxPrice });
+    setIsFilterActive(false);
+  };
+
+  // Format price to Vietnamese Dong
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      minimumFractionDigits: 0,
+    }).format(price);
+  };
+
+  // Hàm xử lý thay đổi giá trị slider
+  const handleSliderChange = (values: number | number[]) => {
+    if (Array.isArray(values)) {
+      setTempPriceRange({ min: values[0], max: values[1] });
+    }
+  };
 
   // Tạo hàm handleFoodPress
   const handleFoodPress = (item: FoodItem) => {
@@ -227,7 +296,6 @@ export default function HomeScreen() {
       return;
     }
 
-    // Transform item for order screen
     const orderItem = {
       id: item.id,
       name: item.name,
@@ -297,19 +365,6 @@ export default function HomeScreen() {
     </View>
   );
 
-  // Xử lý tìm kiếm
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-  };
-
-  // Format price to Vietnamese Dong
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(price);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -335,7 +390,7 @@ export default function HomeScreen() {
                 placeholder="Tìm kiếm món ăn, nhà hàng..."
                 placeholderTextColor="#95A5A6"
                 value={searchQuery}
-                onChangeText={handleSearch}
+                onChangeText={setSearchQuery}
                 returnKeyType="search"
               />
               {searchQuery.length > 0 && (
@@ -393,20 +448,36 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Food Categories */}
+        {/* Food Categories và Filter Button */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Danh mục món ăn</Text>
-            {searchQuery.length > 0 && (
-              <Text style={styles.searchResultText}>
-                Tìm thấy {filteredFoodItems.length} kết quả
-              </Text>
-            )}
-            {loadingError && (
-              <Text style={styles.errorText}>{loadingError}</Text>
-            )}
+
+            <View style={styles.filterButtonContainer}>
+              {isFilterActive && (
+                <TouchableOpacity
+                  style={styles.resetFilterButton}
+                  onPress={resetFilter}
+                >
+                  <Feather name="x" size={16} color="#FF6B35" />
+                  <Text style={styles.resetFilterText}>Xóa lọc</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.filterButton, isFilterActive && styles.filterButtonActive]}
+                onPress={openFilterModal}
+              >
+                <Ionicons
+                  name="filter"
+                  size={20}
+                  color={isFilterActive ? "#FFFFFF" : "#FF6B35"}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
+          {/* Category Tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryTabs}>
             {categories.map((category) => (
               <TouchableOpacity
@@ -426,6 +497,26 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          {/* Hiển thị filter active */}
+          {isFilterActive && (
+            <View style={styles.activeFilterContainer}>
+              <Text style={styles.activeFilterText}>
+                Giá: {formatPrice(priceRange.min)} - {formatPrice(priceRange.max)}
+              </Text>
+            </View>
+          )}
+
+          {/* Kết quả tìm kiếm và lọc */}
+          {searchQuery.length > 0 && (
+            <Text style={styles.searchResultText}>
+              Tìm thấy {filteredFoodItems.length} kết quả
+            </Text>
+          )}
+
+          {loadingError && (
+            <Text style={styles.errorText}>{loadingError}</Text>
+          )}
 
           {/* Loading State */}
           {loading && !refreshing && (
@@ -457,7 +548,6 @@ export default function HomeScreen() {
                         style={styles.foodImage}
                         onError={() => {
                           console.log('Image load error for:', item.imageUrl);
-                          // Không thể thay đổi source trực tiếp, cần xử lý khác
                         }}
                       />
                       <TouchableOpacity style={styles.favoriteButton}>
@@ -498,7 +588,132 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView >
+
+      {/* Modal lọc giá với TextInput */}
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Lọc theo giá</Text>
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(false)}
+                style={styles.closeButton}
+              >
+                <Feather name="x" size={24} color="#2D3436" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.priceRangeContainer}>
+              <Text style={styles.modalSubtitle}>Nhập khoảng giá (VND)</Text>
+
+              <View style={styles.priceInputContainer}>
+                <View style={styles.priceInputGroup}>
+                  <Text style={styles.priceInputLabel}>Giá thấp nhất:</Text>
+                  <View style={styles.priceInputWrapper}>
+                    <TextInput
+                      style={styles.priceInput}
+                      value={tempPriceRange.min.toString()}
+                      onChangeText={(text) => {
+                        const value = parseInt(text) || 0;
+                        setTempPriceRange(prev => ({
+                          ...prev,
+                          min: Math.min(value, tempPriceRange.max)
+                        }));
+                      }}
+                      keyboardType="numeric"
+                      placeholder="0"
+                    />
+                    <Text style={styles.currencyText}>đ</Text>
+                  </View>
+                </View>
+
+                <View style={styles.priceInputGroup}>
+                  <Text style={styles.priceInputLabel}>Giá cao nhất:</Text>
+                  <View style={styles.priceInputWrapper}>
+                    <TextInput
+                      style={styles.priceInput}
+                      value={tempPriceRange.max.toString()}
+                      onChangeText={(text) => {
+                        const value = parseInt(text) || 0;
+                        setTempPriceRange(prev => ({
+                          ...prev,
+                          max: Math.max(value, tempPriceRange.min)
+                        }));
+                      }}
+                      keyboardType="numeric"
+                      placeholder="1000000"
+                    />
+                    <Text style={styles.currencyText}>đ</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.pricePresets}>
+                <Text style={styles.presetsTitle}>Lựa chọn nhanh:</Text>
+                <View style={styles.presetButtons}>
+                  <TouchableOpacity
+                    style={styles.presetButton}
+                    onPress={() => {
+                      const min = Math.min(...foodItems.map(item => item.price));
+                      const max = Math.max(...foodItems.map(item => item.price));
+                      setTempPriceRange({ min, max });
+                    }}
+                  >
+                    <Text style={styles.presetButtonText}>Tất cả</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.presetButton}
+                    onPress={() => {
+                      const max = Math.max(...foodItems.map(item => item.price));
+                      setTempPriceRange({ min: 0, max: 50000 });
+                    }}
+                  >
+                    <Text style={styles.presetButtonText}>Dưới 50k</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.presetButton}
+                    onPress={() => {
+                      setTempPriceRange({ min: 50000, max: 100000 });
+                    }}
+                  >
+                    <Text style={styles.presetButtonText}>50k - 100k</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.presetButton}
+                    onPress={() => {
+                      setTempPriceRange({ min: 100000, max: 200000 });
+                    }}
+                  >
+                    <Text style={styles.presetButtonText}>100k - 200k</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Hủy</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={applyFilterFromModal}
+              >
+                <Text style={styles.applyButtonText}>Áp dụng</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -609,15 +824,63 @@ const styles = StyleSheet.create({
     color: '#FF6B35',
     fontWeight: '600',
   },
+  filterButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+    marginLeft: 10,
+  },
+  filterButtonActive: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  resetFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF2E8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  resetFilterText: {
+    fontSize: 12,
+    color: '#FF6B35',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  activeFilterContainer: {
+    backgroundColor: '#FFF2E8',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  activeFilterText: {
+    fontSize: 14,
+    color: '#FF6B35',
+    fontWeight: '500',
+  },
   searchResultText: {
     fontSize: 12,
     color: '#95A5A6',
     fontStyle: 'italic',
+    marginBottom: 12,
   },
   errorText: {
     fontSize: 12,
     color: '#FF3B30',
     fontStyle: 'italic',
+    marginBottom: 12,
   },
   carouselContainer: {
     marginBottom: 20,
@@ -693,7 +956,7 @@ const styles = StyleSheet.create({
   },
   categoryTabs: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   categoryTab: {
     paddingHorizontal: 20,
@@ -833,5 +1096,143 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#95A5A6',
     textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    minHeight: 300,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D3436',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  priceRangeContainer: {
+    marginBottom: 32,
+  },
+  priceRangeLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  priceRangeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3436',
+  },
+  sliderContainer: {
+    paddingHorizontal: 8,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#636E72',
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: '#FF6B35',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // Thêm vào StyleSheet
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#636E72',
+    marginBottom: 20,
+  },
+  priceInputContainer: {
+    marginBottom: 24,
+  },
+  priceInputGroup: {
+    marginBottom: 16,
+  },
+  priceInputLabel: {
+    fontSize: 14,
+    color: '#636E72',
+    marginBottom: 8,
+  },
+  priceInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  priceInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    color: '#2D3436',
+  },
+  currencyText: {
+    fontSize: 14,
+    color: '#636E72',
+    marginLeft: 8,
+  },
+  pricePresets: {
+    marginBottom: 24,
+  },
+  presetsTitle: {
+    fontSize: 14,
+    color: '#636E72',
+    marginBottom: 12,
+  },
+  presetButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  presetButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  presetButtonText: {
+    fontSize: 14,
+    color: '#636E72',
   },
 });
