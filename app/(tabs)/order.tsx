@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     Linking,
@@ -48,6 +50,45 @@ export default function OrderScreen() {
         loadOrder();
     }, []);
 
+    // ✅ Handle deep link khi quay lại từ PayOS
+    useEffect(() => {
+        const handleDeepLink = (event: { url: string }) => {
+            const url = event.url;
+            console.log("📱 Deep link received:", url);
+
+            if (url.includes("payment/success")) {
+                Alert.alert("✅ Thành công", "Thanh toán PayOS thành công!", [
+                    {
+                        text: "OK",
+                        onPress: async () => {
+                            await AsyncStorage.removeItem("currentOrderId");
+                            setOrder(null);
+                            setItems([]);
+                            setShowPaymentModal(false);
+
+                        }
+                    }
+                ]);
+            } else if (url.includes("payment/cancel")) {
+                Alert.alert("❌ Đã hủy", "Thanh toán PayOS đã bị hủy");
+            } else if (url.includes("payment/error")) {
+                Alert.alert("❌ Lỗi", "Có lỗi xảy ra khi thanh toán");
+            }
+        };
+
+        // Listen for deep link
+        const subscription = Linking.addEventListener("url", handleDeepLink);
+
+        // Check initial URL (khi mở app từ link)
+        Linking.getInitialURL().then((url) => {
+            if (url) {
+                handleDeepLink({ url });
+            }
+        });
+
+        return () => subscription.remove();
+    }, []);
+
     const loadOrder = async () => {
         try {
             const orderIdStr = await AsyncStorage.getItem("currentOrderId");
@@ -57,6 +98,13 @@ export default function OrderScreen() {
             }
 
             const res = await orderAPI.getOrder(Number(orderIdStr));
+            if (res.data.order.status !== "PENDING") {
+                await AsyncStorage.removeItem("currentOrderId");
+                setOrder(null);
+                setItems([]);
+                return;
+            }
+
             setOrder(res.data.order);
             setItems(res.data.items);
         } catch (e) {
@@ -72,7 +120,7 @@ export default function OrderScreen() {
             await orderAPI.updateQuantity(order.id, productId, newQty);
             loadOrder();
         } catch (e) {
-            alert("❌ Không thể cập nhật số lượng");
+            Alert.alert("Lỗi", "Không thể cập nhật số lượng");
         }
     };
 
@@ -82,7 +130,7 @@ export default function OrderScreen() {
             await orderAPI.removeItem(order.id, productId);
             loadOrder();
         } catch (e) {
-            alert("❌ Không thể xóa sản phẩm");
+            Alert.alert("Lỗi", "Không thể xóa sản phẩm");
         }
     };
 
@@ -92,27 +140,47 @@ export default function OrderScreen() {
         try {
             setLoading(true);
 
-            await orderAPI.confirm(order.id);
-
             if (paymentMethod === "PAYOS") {
                 const res = await orderAPI.pay(order.id, "PAYOS");
-
                 const checkoutUrl = res.data.checkoutUrl;
-                await Linking.openURL(checkoutUrl);
-                return;
+
+                if (!checkoutUrl) {
+                    Alert.alert("Lỗi", "Không thể tạo link thanh toán");
+                    return;
+                }
+
+                setShowPaymentModal(false);
+
+                const result = await WebBrowser.openBrowserAsync(checkoutUrl);
+
+                if (result.type === "dismiss") {
+                    // poll backend
+                    let retry = 0;
+                    while (retry < 5) {
+                        const res = await orderAPI.getOrder(order.id);
+                        if (res.data.order.status === "PAID") {
+                            await AsyncStorage.removeItem("currentOrderId");
+                            setOrder(null);
+                            setItems([]);
+                            break;
+                        }
+                        await new Promise(r => setTimeout(r, 1000));
+                        retry++;
+                    }
+                }
             }
 
             // CASH / MOMO
             await orderAPI.pay(order.id, paymentMethod);
-            alert("✅ Thanh toán thành công");
+            Alert.alert("Thành công", "Thanh toán thành công!");
 
             await AsyncStorage.removeItem("currentOrderId");
             setOrder(null);
             setItems([]);
             setShowPaymentModal(false);
 
-        } catch (e) {
-            alert("❌ Thanh toán thất bại");
+        } catch (e: any) {
+            Alert.alert("Lỗi", e.message || "Thanh toán thất bại");
         } finally {
             setLoading(false);
         }
@@ -164,13 +232,11 @@ export default function OrderScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Giỏ hàng của bạn</Text>
                 <Text style={styles.headerSubtitle}>{items.length} sản phẩm</Text>
             </View>
 
-            {/* Cart Items */}
             <FlatList
                 data={items}
                 keyExtractor={(i) => i.id.toString()}
@@ -193,7 +259,6 @@ export default function OrderScreen() {
                                 {item.product.price.toLocaleString()} đ
                             </Text>
 
-                            {/* Quantity Controls */}
                             <View style={styles.quantityContainer}>
                                 <TouchableOpacity
                                     style={[
@@ -234,7 +299,6 @@ export default function OrderScreen() {
                 showsVerticalScrollIndicator={false}
             />
 
-            {/* Order Summary */}
             <View style={styles.summaryCard}>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Tạm tính</Text>
@@ -255,7 +319,6 @@ export default function OrderScreen() {
                 </View>
             </View>
 
-            {/* Checkout Button */}
             <TouchableOpacity
                 style={styles.checkoutButton}
                 onPress={() => setShowPaymentModal(true)}
@@ -264,7 +327,6 @@ export default function OrderScreen() {
                 <Text style={styles.checkoutText}>Thanh toán</Text>
             </TouchableOpacity>
 
-            {/* Payment Modal */}
             <Modal
                 visible={showPaymentModal}
                 transparent

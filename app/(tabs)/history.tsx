@@ -56,8 +56,12 @@ export default function HistoryScreen() {
             const res = await orderAPI.getHistory();
             console.log("📜 History:", res.data);
 
-            // backend trả về { orders: [...] }
-            setOrders(res.data.orders || []);
+            const filtered = (res.data.orders || []).filter(
+                (o: any) => o.status !== "PENDING" && o.status !== "NEW"
+            );
+
+            setOrders(filtered);
+
         } catch (err) {
             console.log("❌ Load history error", err);
         } finally {
