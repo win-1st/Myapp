@@ -52,42 +52,49 @@ export default function OrderScreen() {
 
     // ✅ Handle deep link khi quay lại từ PayOS
     useEffect(() => {
-        const handleDeepLink = (event: { url: string }) => {
+        const handleDeepLink = async (event: { url: string }) => {
             const url = event.url;
             console.log("📱 Deep link received:", url);
 
-            if (url.includes("payment/success")) {
-                Alert.alert("✅ Thành công", "Thanh toán PayOS thành công!", [
-                    {
-                        text: "OK",
-                        onPress: async () => {
-                            await AsyncStorage.removeItem("currentOrderId");
-                            setOrder(null);
-                            setItems([]);
-                            setShowPaymentModal(false);
+            if (!order) return;
 
-                        }
+            if (url.includes("payment/success")) {
+
+                let retry = 0;
+                while (retry < 10) {
+                    const res = await orderAPI.getOrder(order.id);
+
+                    if (res.data.order.status === "PAID") {
+                        await AsyncStorage.removeItem("currentOrderId");
+                        setOrder(null);
+                        setItems([]);
+                        setShowPaymentModal(false);
+
+                        Alert.alert("✅ Thành công", "Thanh toán PayOS thành công!");
+                        return;
                     }
-                ]);
-            } else if (url.includes("payment/cancel")) {
+
+                    await new Promise(r => setTimeout(r, 1000));
+                    retry++;
+                }
+
+                Alert.alert("⏳ Đang xử lý", "Thanh toán đang được xác nhận, vui lòng chờ");
+            }
+
+            if (url.includes("payment/cancel")) {
                 Alert.alert("❌ Đã hủy", "Thanh toán PayOS đã bị hủy");
-            } else if (url.includes("payment/error")) {
-                Alert.alert("❌ Lỗi", "Có lỗi xảy ra khi thanh toán");
             }
         };
 
-        // Listen for deep link
         const subscription = Linking.addEventListener("url", handleDeepLink);
 
-        // Check initial URL (khi mở app từ link)
         Linking.getInitialURL().then((url) => {
-            if (url) {
-                handleDeepLink({ url });
-            }
+            if (url) handleDeepLink({ url });
         });
 
         return () => subscription.remove();
-    }, []);
+    }, [order]);
+
 
     const loadOrder = async () => {
         try {
@@ -98,7 +105,9 @@ export default function OrderScreen() {
             }
 
             const res = await orderAPI.getOrder(Number(orderIdStr));
-            if (res.data.order.status !== "PENDING") {
+            const status = res.data.order.status;
+
+            if (status !== "NEW") {
                 await AsyncStorage.removeItem("currentOrderId");
                 setOrder(null);
                 setItems([]);
@@ -107,12 +116,14 @@ export default function OrderScreen() {
 
             setOrder(res.data.order);
             setItems(res.data.items);
+
         } catch (e) {
             console.log("❌ Load order error", e);
         } finally {
             setLoading(false);
         }
     };
+
 
     const changeQuantity = async (productId: number, newQty: number) => {
         if (!order || newQty < 1) return;
@@ -140,6 +151,7 @@ export default function OrderScreen() {
         try {
             setLoading(true);
 
+            // ===== PAYOS =====
             if (paymentMethod === "PAYOS") {
                 const res = await orderAPI.pay(order.id, "PAYOS");
                 const checkoutUrl = res.data.checkoutUrl;
@@ -151,27 +163,15 @@ export default function OrderScreen() {
 
                 setShowPaymentModal(false);
 
-                const result = await WebBrowser.openBrowserAsync(checkoutUrl);
+                await WebBrowser.openBrowserAsync(checkoutUrl);
 
-                if (result.type === "dismiss") {
-                    // poll backend
-                    let retry = 0;
-                    while (retry < 5) {
-                        const res = await orderAPI.getOrder(order.id);
-                        if (res.data.order.status === "PAID") {
-                            await AsyncStorage.removeItem("currentOrderId");
-                            setOrder(null);
-                            setItems([]);
-                            break;
-                        }
-                        await new Promise(r => setTimeout(r, 1000));
-                        retry++;
-                    }
-                }
+                // ❗ KHÔNG clear giỏ ở đây
+                return;
             }
 
-            // CASH / MOMO
+            // ===== CASH / MOMO =====
             await orderAPI.pay(order.id, paymentMethod);
+
             Alert.alert("Thành công", "Thanh toán thành công!");
 
             await AsyncStorage.removeItem("currentOrderId");
@@ -185,6 +185,7 @@ export default function OrderScreen() {
             setLoading(false);
         }
     };
+
 
     const renderPaymentMethodIcon = (method: string) => {
         switch (method) {

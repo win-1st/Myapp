@@ -20,6 +20,11 @@ export const authAPI = {
                 'Content-Type': 'multipart/form-data',
             },
         }),
+
+    changePassword: (data: {
+        oldPassword: string;
+        newPassword: string;
+    }) => api.put("/api/auth/change-password", data),
 };
 
 

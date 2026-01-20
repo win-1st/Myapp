@@ -79,6 +79,12 @@ export default function ProfileScreen() {
             <Text style={styles.menuText}>Chỉnh sửa thông tin</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/change-password")}
+          >
+            <Text style={styles.menuText}>Đổi mật khẩu</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.menuItem, { backgroundColor: "#FEF2F2" }]}
             onPress={() => {
               Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
